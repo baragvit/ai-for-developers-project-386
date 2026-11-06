@@ -249,6 +249,7 @@ function validateGuest(values: { guestName: string; guestEmail: string; comment:
   if (!values.guestName.trim()) errors.guestName = 'Представьтесь, пожалуйста'
   else if (values.guestName.trim().length > 100) errors.guestName = 'Не длиннее 100 символов'
   if (!EMAIL_PATTERN.test(values.guestEmail.trim())) errors.guestEmail = 'Укажите корректный email'
+  else if (values.guestEmail.trim().length > 254) errors.guestEmail = 'Не длиннее 254 символов'
   if (values.comment.length > 1000) errors.comment = 'Не длиннее 1000 символов'
   return errors
 }
@@ -314,11 +315,14 @@ function GuestForm({
           <ArrowLeft />
           Выбрать другое время
         </Button>
-        <div className="flex items-start gap-3 rounded-lg bg-accent p-3 text-accent-foreground">
+        <div
+          data-testid="booking-summary"
+          className="flex items-start gap-3 rounded-lg bg-accent p-3 text-accent-foreground"
+        >
           <CalendarCheck2 className="mt-0.5 size-5 shrink-0" />
           <div className="text-sm">
             <p className="font-semibold">{capitalize(formatDayLong(slot.startAt))}</p>
-            <p data-testid="selected-slot">
+            <p>
               {formatTimeRange(slot.startAt, slot.endAt)} · {eventType.name}
             </p>
           </div>
@@ -366,6 +370,7 @@ function GuestForm({
     </Card>
   )
 }
+
 function BookingConfirmation({ booking, onBookAnother }: { booking: Booking; onBookAnother: () => void }) {
   return (
     <Card data-testid="booking-confirmation">
@@ -373,7 +378,7 @@ function BookingConfirmation({ booking, onBookAnother }: { booking: Booking; onB
         <div className="mb-4 flex size-14 items-center justify-center rounded-full bg-emerald-100 text-emerald-700">
           <CheckCircle2 className="size-8" />
         </div>
-        <h2 className="text-2xl font-bold tracking-tight">Вы записаны!</h2>
+        <h2 className="text-2xl font-bold tracking-tight">Запись подтверждена</h2>
         <p className="mt-2 max-w-md text-muted-foreground">
           {booking.guestName}, ждём вас на встрече «{booking.eventTypeName}».
         </p>
@@ -381,6 +386,7 @@ function BookingConfirmation({ booking, onBookAnother }: { booking: Booking; onB
           <p className="font-semibold">{capitalize(formatDayLong(booking.startAt))}</p>
           <p>{formatTimeRange(booking.startAt, booking.endAt)}</p>
           <p className="text-muted-foreground">{booking.guestEmail}</p>
+          {booking.comment && <p className="break-words text-muted-foreground">{booking.comment}</p>}
         </div>
         <div className="mt-6 flex flex-col gap-2 sm:flex-row">
           <Button variant="outline" onClick={onBookAnother}>

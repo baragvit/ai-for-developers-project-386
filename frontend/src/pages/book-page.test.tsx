@@ -97,3 +97,33 @@ describe('Календарь свободных слотов', () => {
     expect(screen.getByRole('link', { name: 'К типам встреч' })).toHaveAttribute('href', '/book')
   })
 })
+
+describe('Форма записи', () => {
+  it('показывает серверные ошибки валидации у соответствующих полей формы', async () => {
+    openBookPage(slots)
+    await userEvent.click((await screen.findAllByTestId('slot'))[0]!)
+    respond(
+      'POST',
+      '/api/bookings',
+      {
+        code: 'VALIDATION_ERROR',
+        message: 'Проверьте правильность заполнения полей',
+        details: [
+          { field: 'guestEmail', message: 'Укажите корректный email' },
+          { field: 'comment', message: 'Не длиннее 1000 символов' },
+        ],
+      },
+      400,
+    )
+
+    await userEvent.type(screen.getByLabelText('Ваше имя'), 'Ольга')
+    await userEvent.type(screen.getByLabelText('Email'), 'olga@example.c')
+    await userEvent.click(screen.getByRole('button', { name: 'Записаться' }))
+
+    expect(await screen.findByText('Укажите корректный email')).toBeInTheDocument()
+    expect(screen.getByLabelText('Email')).toHaveAttribute('aria-invalid', 'true')
+    expect(screen.getByLabelText(/Комментарий/)).toHaveAttribute('aria-invalid', 'true')
+    expect(screen.getByLabelText('Ваше имя')).toHaveAttribute('aria-invalid', 'false')
+    expect(screen.getByLabelText('Email')).toHaveValue('olga@example.c')
+  })
+})
