@@ -48,6 +48,12 @@ export const moscowTime = (iso: string) =>
     new Date(iso),
   )
 
+/** «9 ноября» */
+export const moscowDate = (iso: string) =>
+  new Intl.DateTimeFormat('ru-RU', { timeZone: 'Europe/Moscow', day: 'numeric', month: 'long' }).format(
+    new Date(iso),
+  )
+
 /** Opens the calendar day containing `iso` (browser runs in Europe/Moscow), paging months if needed. */
 export async function selectDay(page: Page, iso: string) {
   const cell = page.locator(`td[data-day="${moscowDay(iso)}"] button`)

@@ -1,5 +1,13 @@
 import { expect, test } from '@playwright/test'
-import { bookViaApi, createEventType, firstAvailableSlot, moscowTime, selectDay, slotButton } from './support.js'
+import {
+  bookViaApi,
+  createEventType,
+  firstAvailableSlot,
+  moscowDate,
+  moscowTime,
+  selectDay,
+  slotButton,
+} from './support.js'
 
 test.describe('Гость', () => {
   test('с главной страницы переходит в каталог и видит типы встреч', async ({ page, request }) => {
@@ -33,8 +41,11 @@ test.describe('Гость', () => {
     await expect(page).toHaveURL(new RegExp(`/book/${eventType.id}$`))
 
     await selectDay(page, slot.startAt)
-    await slotButton(page, slot.startAt).first().click()
-    await expect(page.getByTestId('selected-slot')).toContainText(moscowTime(slot.startAt))
+    await slotButton(page, slot.startAt).click()
+    const summary = page.getByTestId('booking-summary')
+    await expect(summary).toContainText(moscowDate(slot.startAt))
+    await expect(summary).toContainText(moscowTime(slot.startAt))
+    await expect(summary).toContainText(eventType.name)
 
     await page.getByLabel('Ваше имя').fill(guestName)
     await page.getByLabel('Email').fill('olga@example.com')
@@ -42,14 +53,42 @@ test.describe('Гость', () => {
     await page.getByRole('button', { name: 'Записаться' }).click()
 
     const confirmation = page.getByTestId('booking-confirmation')
-    await expect(confirmation).toContainText('Вы записаны!')
+    await expect(confirmation.getByRole('heading', { name: 'Запись подтверждена' })).toBeVisible()
+    await expect(confirmation).toContainText(eventType.name)
+    await expect(confirmation).toContainText(moscowDate(slot.startAt))
     await expect(confirmation).toContainText(moscowTime(slot.startAt))
+    await expect(confirmation).toContainText(guestName)
+    await expect(confirmation).toContainText('olga@example.com')
+    await expect(confirmation).toContainText('Хочу обсудить интеграцию')
+
+    await confirmation.getByRole('button', { name: 'Записаться ещё раз' }).click()
+    await selectDay(page, slot.startAt)
+    await expect(slotButton(page, slot.startAt)).toBeDisabled()
 
     await page.goto('/admin')
+    await expect(page.getByRole('tab', { name: /Предстоящие встречи/ })).toHaveAttribute('aria-selected', 'true')
     const row = page.getByTestId('booking-row').filter({ hasText: guestName })
+    await expect(row).toContainText(moscowTime(slot.startAt))
     await expect(row).toContainText(eventType.name)
     await expect(row).toContainText('olga@example.com')
     await expect(row).toContainText('Хочу обсудить интеграцию')
+  })
+
+  test('из подтверждения переходит к другим типам встреч', async ({ page, request }) => {
+    const eventType = await createEventType(request)
+    const slot = await firstAvailableSlot(request, eventType.id)
+
+    await page.goto(`/book/${eventType.id}`)
+    await selectDay(page, slot.startAt)
+    await slotButton(page, slot.startAt).click()
+    await page.getByLabel('Ваше имя').fill('Ольга')
+    await page.getByLabel('Email').fill('olga@example.com')
+    await page.getByRole('button', { name: 'Записаться' }).click()
+
+    await page.getByTestId('booking-confirmation').getByRole('link', { name: 'Другие типы встреч' }).click()
+
+    await expect(page).toHaveURL(/\/book$/)
+    await expect(page.getByRole('heading', { level: 1, name: 'Типы встреч' })).toBeVisible()
   })
 
   test('не может выбрать время, занятое встречей другого типа', async ({ page, request }) => {
@@ -81,17 +120,52 @@ test.describe('Гость', () => {
     await expect(slotButton(page, slot.startAt)).toBeDisabled()
   })
 
-  test('видит подсказки при некорректно заполненной форме', async ({ page, request }) => {
+  test('видит ошибки у полей формы и не записывается, пока они не исправлены', async ({ page, request }) => {
     const eventType = await createEventType(request)
+    const slot = await firstAvailableSlot(request, eventType.id)
+    const bookingRequests: string[] = []
+    page.on('request', (req) => {
+      if (req.method() === 'POST' && req.url().endsWith('/api/bookings')) bookingRequests.push(req.url())
+    })
 
     await page.goto(`/book/${eventType.id}`)
-    await page.getByTestId('slot').and(page.locator(':enabled')).first().click()
-    await page.getByLabel('Email').fill('not-an-email')
+    await selectDay(page, slot.startAt)
+    await slotButton(page, slot.startAt).click()
     await page.getByRole('button', { name: 'Записаться' }).click()
 
     await expect(page.getByText('Представьтесь, пожалуйста')).toBeVisible()
     await expect(page.getByText('Укажите корректный email')).toBeVisible()
-    await expect(page.getByTestId('booking-confirmation')).toHaveCount(0)
+    await expect(page.getByLabel('Ваше имя')).toHaveAttribute('aria-invalid', 'true')
+
+    await page.getByLabel('Ваше имя').fill('Ольга')
+    await page.getByLabel('Email').fill('not-an-email')
+    await page.getByLabel('Комментарий').fill('я'.repeat(1001))
+    await page.getByRole('button', { name: 'Записаться' }).click()
+
+    await expect(page.getByText('Представьтесь, пожалуйста')).toBeHidden()
+    await expect(page.getByText('Укажите корректный email')).toBeVisible()
+    await expect(page.getByText('Не длиннее 1000 символов')).toBeVisible()
+    expect(bookingRequests).toEqual([])
+
+    await page.getByLabel('Email').fill('olga@example.com')
+    await page.getByLabel('Комментарий').fill('Коротко')
+    await page.getByRole('button', { name: 'Записаться' }).click()
+
+    await expect(page.getByTestId('booking-confirmation')).toBeVisible()
+    expect(bookingRequests).toHaveLength(1)
+  })
+
+  test('возвращается к выбору времени из формы', async ({ page, request }) => {
+    const eventType = await createEventType(request)
+    const slot = await firstAvailableSlot(request, eventType.id)
+
+    await page.goto(`/book/${eventType.id}`)
+    await selectDay(page, slot.startAt)
+    await slotButton(page, slot.startAt).click()
+    await page.getByRole('button', { name: 'Выбрать другое время' }).click()
+
+    await expect(page.getByLabel('Ваше имя')).toBeHidden()
+    await expect(slotButton(page, slot.startAt)).toBeEnabled()
   })
 })
 
