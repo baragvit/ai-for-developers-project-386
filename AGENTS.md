@@ -20,14 +20,15 @@ Hexlet project «Запись на звонок» (Cal.com-like booking, no auth
 
 ## Commands
 
+Tool versions are pinned in `mise.toml`.
+
 ```bash
-npm ci
+mise install && mise run install
 npm run contract      # TypeSpec -> OpenAPI -> TS types
 npm run mock          # Prism mock on :4010
 npm run dev:backend   # :7341
 npm run dev:frontend  # :5391, proxies /api to API_PROXY_TARGET (default :7341)
-npm run lint && npm run typecheck && npm test
-npm run test:e2e
+mise run check        # contract up to date, lint, typecheck, unit tests, e2e — same command as CI
 ```
 
 ## Conventions

@@ -1,0 +1,43 @@
+[tools]
+node = "22.23.4"
+
+[tasks.install]
+description = "Install dependencies of all workspaces"
+run = "npm ci"
+
+[tasks.contract]
+description = "Compile TypeSpec -> OpenAPI and regenerate client/server types"
+run = "npm run contract"
+
+[tasks."contract:check"]
+description = "Fail if generated contract files are out of date"
+run = [
+  "npm run contract",
+  "git diff --exit-code -- api-contract/openapi.yaml backend/src/api/model frontend/src/api",
+]
+
+[tasks.lint]
+description = "oxlint for frontend and backend"
+run = "npm run lint"
+
+[tasks.typecheck]
+description = "tsc in all workspaces"
+run = "npm run typecheck"
+
+[tasks.test]
+description = "Backend unit and API tests (Vitest)"
+run = "npm test"
+
+[tasks.e2e]
+description = "Playwright scenarios against the production build"
+run = "npm run test:e2e"
+
+[tasks.check]
+description = "All checks, locally and in CI"
+run = [
+  "mise run contract:check",
+  "mise run lint",
+  "mise run typecheck",
+  "mise run test",
+  "mise run e2e",
+]

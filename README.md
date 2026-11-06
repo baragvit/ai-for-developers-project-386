@@ -73,11 +73,12 @@ Dockerfile      один образ: бэкенд отдаёт API и собра
 
 ## Запуск локально
 
-Нужен Node.js 22+.
+Версии инструментов зафиксированы в [`mise.toml`](mise.toml) (Node.js 22.23.4). Установите [mise](https://mise.jdx.dev/getting-started.html), он поставит нужный Node.js.
 
 ```bash
 git clone https://github.com/baragvit/ai-for-developers-project-386.git
 cd ai-for-developers-project-386
+mise install        # Node.js из mise.toml
 make install        # npm ci для всех пакетов
 ```
 
@@ -124,6 +125,14 @@ docker run --rm -p 8080:8080 call-booking   # http://127.0.0.1:8080
 
 ## Проверки
 
+Все проверки одной командой, той же, что в CI:
+
+```bash
+mise run check      # актуальность контракта, линтер, типы, unit-тесты, e2e
+```
+
+По отдельности:
+
 ```bash
 make lint           # oxlint для фронтенда и бэкенда
 make typecheck      # tsc во всех пакетах
@@ -135,7 +144,7 @@ make e2e            # Playwright: собирает приложение, под�
 
 Сценарии e2e: гость видит типы встреч; гость бронирует слот, и встреча появляется у владельца; время, занятое встречей другого типа, недоступно; гонка за один слот даёт понятную ошибку; валидация формы; владелец создаёт тип встречи; дубликат id отклоняется.
 
-В GitHub Actions ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) запускаются проверка актуальности контракта, линтер, типы, unit-тесты, e2e и смоук-тест Docker-образа.
+В GitHub Actions ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) на каждый push запускается `mise run check`, а затем смоук-тест Docker-образа.
 
 ## Деплой
 
