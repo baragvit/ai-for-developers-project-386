@@ -32,6 +32,7 @@ export function BookPage() {
   const [selectedSlot, setSelectedSlot] = useState<TimeSlot>()
   const [lastViewedDay, setLastViewedDay] = useState<Date>()
   const [booking, setBooking] = useState<Booking>()
+  const [guest, setGuest] = useState<GuestValues>(emptyGuest)
 
   if (eventType.error?.code === 'NOT_FOUND') {
     return (
@@ -73,6 +74,7 @@ export function BookPage() {
   const handleBooked = (created: Booking) => {
     setBooking(created)
     setSelectedSlot(undefined)
+    setGuest(emptyGuest)
   }
 
   return (
@@ -93,6 +95,8 @@ export function BookPage() {
           <GuestForm
             eventType={eventType.data}
             slot={selectedSlot}
+            values={guest}
+            onChange={setGuest}
             onBack={() => setSelectedSlot(undefined)}
             onBooked={handleBooked}
             onSlotLost={() => setSelectedSlot(undefined)}
@@ -240,15 +244,20 @@ function SlotPicker({
   )
 }
 
-type FormErrors = Partial<Record<'guestName' | 'guestEmail' | 'comment', string>>
+type GuestValues = { guestName: string; guestEmail: string; comment: string }
+
+const emptyGuest: GuestValues = { guestName: '', guestEmail: '', comment: '' }
+
+type FormErrors = Partial<Record<keyof GuestValues, string>>
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
-function validateGuest(values: { guestName: string; guestEmail: string; comment: string }): FormErrors {
+function validateGuest(values: GuestValues): FormErrors {
   const errors: FormErrors = {}
   if (!values.guestName.trim()) errors.guestName = 'Представьтесь, пожалуйста'
   else if (values.guestName.trim().length > 100) errors.guestName = 'Не длиннее 100 символов'
   if (!EMAIL_PATTERN.test(values.guestEmail.trim())) errors.guestEmail = 'Укажите корректный email'
+  else if (values.guestEmail.trim().length > 254) errors.guestEmail = 'Не длиннее 254 символов'
   if (values.comment.length > 1000) errors.comment = 'Не длиннее 1000 символов'
   return errors
 }
@@ -256,22 +265,25 @@ function validateGuest(values: { guestName: string; guestEmail: string; comment:
 function GuestForm({
   eventType,
   slot,
+  values,
+  onChange,
   onBack,
   onBooked,
   onSlotLost,
 }: {
   eventType: EventType
   slot: TimeSlot
+  values: GuestValues
+  onChange: (values: GuestValues) => void
   onBack: () => void
   onBooked: (booking: Booking) => void
   onSlotLost: () => void
 }) {
-  const [values, setValues] = useState({ guestName: '', guestEmail: '', comment: '' })
   const [errors, setErrors] = useState<FormErrors>({})
   const createBooking = useCreateBooking()
 
-  const update = (field: keyof typeof values) => (value: string) => {
-    setValues((prev) => ({ ...prev, [field]: value }))
+  const update = (field: keyof GuestValues) => (value: string) => {
+    onChange({ ...values, [field]: value })
     setErrors((prev) => ({ ...prev, [field]: undefined }))
   }
 
@@ -314,11 +326,14 @@ function GuestForm({
           <ArrowLeft />
           Выбрать другое время
         </Button>
-        <div className="flex items-start gap-3 rounded-lg bg-accent p-3 text-accent-foreground">
+        <div
+          data-testid="booking-summary"
+          className="flex items-start gap-3 rounded-lg bg-accent p-3 text-accent-foreground"
+        >
           <CalendarCheck2 className="mt-0.5 size-5 shrink-0" />
           <div className="text-sm">
             <p className="font-semibold">{capitalize(formatDayLong(slot.startAt))}</p>
-            <p data-testid="selected-slot">
+            <p>
               {formatTimeRange(slot.startAt, slot.endAt)} · {eventType.name}
             </p>
           </div>
@@ -366,6 +381,7 @@ function GuestForm({
     </Card>
   )
 }
+
 function BookingConfirmation({ booking, onBookAnother }: { booking: Booking; onBookAnother: () => void }) {
   return (
     <Card data-testid="booking-confirmation">
@@ -373,7 +389,7 @@ function BookingConfirmation({ booking, onBookAnother }: { booking: Booking; onB
         <div className="mb-4 flex size-14 items-center justify-center rounded-full bg-emerald-100 text-emerald-700">
           <CheckCircle2 className="size-8" />
         </div>
-        <h2 className="text-2xl font-bold tracking-tight">Вы записаны!</h2>
+        <h2 className="text-2xl font-bold tracking-tight">Запись подтверждена</h2>
         <p className="mt-2 max-w-md text-muted-foreground">
           {booking.guestName}, ждём вас на встрече «{booking.eventTypeName}».
         </p>
@@ -381,6 +397,7 @@ function BookingConfirmation({ booking, onBookAnother }: { booking: Booking; onB
           <p className="font-semibold">{capitalize(formatDayLong(booking.startAt))}</p>
           <p>{formatTimeRange(booking.startAt, booking.endAt)}</p>
           <p className="text-muted-foreground">{booking.guestEmail}</p>
+          {booking.comment && <p className="break-words text-muted-foreground">{booking.comment}</p>}
         </div>
         <div className="mt-6 flex flex-col gap-2 sm:flex-row">
           <Button variant="outline" onClick={onBookAnother}>

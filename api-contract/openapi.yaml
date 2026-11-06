@@ -368,7 +368,8 @@ components:
           format: int32
           minimum: 5
           maximum: 240
-          description: Длительность встречи в минутах.
+          multipleOf: 5
+          description: Длительность встречи в минутах, кратна 5.
       description: Тип встречи, на который гость может записаться.
       example:
         id: consultation

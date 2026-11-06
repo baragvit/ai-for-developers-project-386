@@ -27,7 +27,9 @@ export function wasRequested(method: string, path: string): boolean {
   return handled.includes(`${method} ${path}`)
 }
 
+/** A later call for the same method and path replaces the earlier answer. */
 export function respond(method: string, path: string, body: unknown, status = 200) {
+  routes = routes.filter((route) => !(route.method === method && route.path === path))
   routes.push({ method, path, status, body })
 }
 

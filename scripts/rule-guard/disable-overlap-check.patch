@@ -1,0 +1,10 @@
+diff --git a/backend/src/domain/model.ts b/backend/src/domain/model.ts
+index e159579..192a5e7 100644
+--- a/backend/src/domain/model.ts
++++ b/backend/src/domain/model.ts
+@@ -56,4 +56,4 @@ export type DomainError =
+   | { kind: 'SlotUnavailable'; start: Date }
+   | { kind: 'SlotTaken'; start: Date }
+ 
+-export const overlaps = (a: Interval, b: Interval): boolean => a.start < b.end && b.start < a.end
++export const overlaps = (_a: Interval, _b: Interval): boolean => false

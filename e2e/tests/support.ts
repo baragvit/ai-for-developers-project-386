@@ -40,11 +40,19 @@ export async function bookViaApi(request: APIRequestContext, eventTypeId: string
   expect(res.status()).toBe(201)
 }
 
+export const halfAnHourLater = (iso: string) => new Date(new Date(iso).getTime() + 30 * 60_000).toISOString()
+
 const moscowDay = (iso: string) =>
   new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Moscow' }).format(new Date(iso))
 
 export const moscowTime = (iso: string) =>
   new Intl.DateTimeFormat('ru-RU', { timeZone: 'Europe/Moscow', hour: '2-digit', minute: '2-digit' }).format(
+    new Date(iso),
+  )
+
+/** «9 ноября» */
+export const moscowDate = (iso: string) =>
+  new Intl.DateTimeFormat('ru-RU', { timeZone: 'Europe/Moscow', day: 'numeric', month: 'long' }).format(
     new Date(iso),
   )
 

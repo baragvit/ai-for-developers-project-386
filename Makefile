@@ -1,5 +1,5 @@
 .DEFAULT_GOAL := help
-.PHONY: help install contract mock dev-mock dev-backend dev-frontend build start lint typecheck test e2e check docker-build docker-run
+.PHONY: help install contract mock dev-mock dev-backend dev-frontend build start lint typecheck test e2e check check-rule-guard docker-build docker-run
 
 help:
 	@echo "make install       - install dependencies of all workspaces"
@@ -12,6 +12,7 @@ help:
 	@echo "make start         - run the production build on :7341 (API + SPA)"
 	@echo "make lint | typecheck | test | e2e"
 	@echo "make check         - all checks (mise run check), same as CI"
+	@echo "make check-rule-guard - conflict tests must fail with the overlap check disabled (mise run check:rule-guard)"
 	@echo "make docker-build  - build the Docker image"
 	@echo "make docker-run    - run the image on :8080"
 
@@ -53,6 +54,9 @@ e2e:
 
 check:
 	mise run check
+
+check-rule-guard:
+	mise run check:rule-guard
 
 docker-build:
 	docker build -t call-booking .

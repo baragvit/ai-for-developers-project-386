@@ -1,15 +1,45 @@
 {
-  "$schema": "../node_modules/oxlint/configuration_schema.json",
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
   "plugins": ["react", "typescript", "oxc"],
   "rules": {
     "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
+    "react/only-export-components": ["warn", { "allowConstantExport": true }],
+    "no-restricted-globals": [
+      "error",
+      { "name": "fetch", "message": "Call the API through the generated client in src/api." },
+      { "name": "XMLHttpRequest", "message": "Call the API through the generated client in src/api." }
+    ],
+    "no-restricted-properties": [
+      "error",
+      { "object": "window", "property": "fetch", "message": "Call the API through the generated client in src/api." },
+      { "object": "globalThis", "property": "fetch", "message": "Call the API through the generated client in src/api." }
+    ],
+    "no-restricted-imports": [
+      "error",
+      {
+        "paths": [{ "name": "openapi-fetch", "message": "Only src/api may create the API client." }]
+      }
+    ]
   },
   "overrides": [
     {
       "files": ["src/components/ui/**"],
       "rules": {
         "react/only-export-components": "off"
+      }
+    },
+    {
+      "files": ["src/api/**"],
+      "rules": {
+        "no-restricted-globals": "off",
+        "no-restricted-properties": "off",
+        "no-restricted-imports": "off"
+      }
+    },
+    {
+      "files": ["src/test/**"],
+      "rules": {
+        "no-restricted-properties": "off"
       }
     }
   ]

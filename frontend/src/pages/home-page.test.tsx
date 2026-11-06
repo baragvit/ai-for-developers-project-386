@@ -1,7 +1,7 @@
-import { screen, waitFor, within } from '@testing-library/react'
+import { screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it } from 'vitest'
-import { eventType, owner, respond, wasRequested } from '@/test/api'
+import { eventType, owner, respond } from '@/test/api'
 import { renderApp } from '@/test/render'
 
 const main = () => within(screen.getByRole('main'))
@@ -54,15 +54,20 @@ describe('Главная страница', () => {
     expect(main().getByText('Время показано в вашем часовом поясе: Asia/Vladivostok')).toBeInTheDocument()
   })
 
-  it('открывается и ведёт в каталог, даже если данные владельца не загрузились', async () => {
+  it('показывает ошибку загрузки владельца, ведёт в каталог и загружает владельца повторно', async () => {
     respond('GET', '/api/owner', { code: 'INTERNAL_ERROR', message: 'Внутренняя ошибка сервера' }, 500)
     renderApp('/')
 
-    await waitFor(() => expect(wasRequested('GET', '/api/owner')).toBe(true))
-
-    expect(main().getByRole('heading', { level: 1, name: 'Запишитесь на звонок' })).toBeInTheDocument()
-    expect(screen.queryByRole('region', { name: 'Владелец календаря' })).not.toBeInTheDocument()
+    const card = within(screen.getByRole('region', { name: 'Владелец календаря' }))
+    expect(await card.findByText('Не удалось загрузить данные владельца')).toBeInTheDocument()
+    expect(card.getByText('Внутренняя ошибка сервера')).toBeInTheDocument()
     expect(main().getByRole('link', { name: 'Записаться' })).toHaveAttribute('href', '/book')
     expect(screen.getByRole('region', { name: 'Как это работает' })).toBeInTheDocument()
+
+    respond('GET', '/api/owner', owner)
+    await userEvent.click(card.getByRole('button', { name: 'Повторить' }))
+
+    expect(await card.findByText('Анна Смирнова')).toBeInTheDocument()
+    expect(card.queryByText('Не удалось загрузить данные владельца')).not.toBeInTheDocument()
   })
 })
