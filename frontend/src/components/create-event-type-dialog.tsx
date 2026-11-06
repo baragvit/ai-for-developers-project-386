@@ -38,7 +38,7 @@ function validate(values: Values): Errors {
   if (!Number.isInteger(duration) || duration < 5 || duration > 240) {
     errors.durationMinutes = 'Целое число от 5 до 240 минут'
   } else if (duration % DURATION_STEP_MINUTES !== 0) {
-    errors.durationMinutes = 'Длительность должна быть кратна 5 минутам'
+    errors.durationMinutes = `Длительность должна быть кратна ${DURATION_STEP_MINUTES} минутам`
   }
 
   if (values.description.length > 500) errors.description = 'Не длиннее 500 символов'
