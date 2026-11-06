@@ -1,0 +1,17 @@
+{
+  "name": "api-contract",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "build": "tsp compile . && cp tsp-output/schema/openapi.yaml openapi.yaml",
+    "mock": "prism mock openapi.yaml --port 4010 --host 127.0.0.1 --dynamic=false"
+  },
+  "devDependencies": {
+    "@stoplight/prism-cli": "^5.14.2",
+    "@typespec/compiler": "^1.17.0",
+    "@typespec/http": "^1.17.0",
+    "@typespec/openapi": "^1.17.0",
+    "@typespec/openapi3": "^1.17.0"
+  }
+}

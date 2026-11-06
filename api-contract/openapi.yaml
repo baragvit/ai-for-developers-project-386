@@ -1,0 +1,472 @@
+openapi: 3.0.0
+info:
+  title: Call Booking API
+  version: 1.0.0
+  description: |-
+    «Запись на звонок»: владелец календаря публикует типы встреч, гость выбирает свободный слот и бронирует звонок.
+
+    Авторизации нет: владелец — один заранее заданный профиль, гости бронируют без аккаунта.
+    Маршруты владельца отделены префиксом `/api/admin`.
+
+    Правила бронирования:
+    - слоты считаются в рабочие дни и часы владельца (в его часовом поясе) на `bookingWindowDays` дней вперёд, начиная с сегодняшнего дня;
+    - шаг слотов равен длительности типа встречи, прошедшие слоты недоступны;
+    - на одно и то же время нельзя создать две записи, даже если это разные типы встреч.
+tags:
+  - name: Guest
+  - name: Owner
+paths:
+  /api/admin/bookings:
+    get:
+      operationId: Admin_listUpcomingBookings
+      summary: Предстоящие встречи
+      description: Записи всех типов, которые ещё не закончились, одним списком по возрастанию startAt.
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Booking'
+              example:
+                - id: 6ba7b810-9dad-41d1-80b4-00c04fd430c8
+                  eventTypeId: consultation
+                  eventTypeName: Консультация
+                  startAt: '2026-11-10T06:30:00Z'
+                  endAt: '2026-11-10T07:00:00Z'
+                  guestName: Иван Петров
+                  guestEmail: ivan@example.com
+                  comment: Хочу обсудить архитектуру сервиса
+                  createdAt: '2026-11-06T12:00:00Z'
+                - id: 9b2f3c1e-4a5d-4e6f-8a7b-1c2d3e4f5a6b
+                  eventTypeId: code-review
+                  eventTypeName: Ревью кода
+                  startAt: '2026-11-11T09:00:00Z'
+                  endAt: '2026-11-11T09:45:00Z'
+                  guestName: Мария Козлова
+                  guestEmail: maria@example.com
+                  createdAt: '2026-11-06T13:30:00Z'
+      tags:
+        - Owner
+  /api/admin/event-types:
+    post:
+      operationId: Admin_createEventType
+      summary: Создать тип встречи
+      parameters: []
+      responses:
+        '201':
+          description: The request has succeeded and a new resource has been created as a result.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EventType'
+        '400':
+          description: 'Некорректный запрос: невалидные поля или время, которое нельзя забронировать.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BadRequestError'
+        '409':
+          description: Конфликт с текущим состоянием.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConflictError'
+      tags:
+        - Owner
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EventType'
+  /api/bookings:
+    post:
+      operationId: Public_createBooking
+      summary: Забронировать слот
+      parameters: []
+      responses:
+        '201':
+          description: The request has succeeded and a new resource has been created as a result.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Booking'
+        '400':
+          description: 'Некорректный запрос: невалидные поля или время, которое нельзя забронировать.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BadRequestError'
+        '404':
+          description: Ресурс не найден.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotFoundError'
+        '409':
+          description: Конфликт с текущим состоянием.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConflictError'
+      tags:
+        - Guest
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateBookingRequest'
+  /api/event-types:
+    get:
+      operationId: Public_listEventTypes
+      summary: Список типов встреч
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/EventType'
+              example:
+                - id: consultation
+                  name: Консультация
+                  description: Обсудим ваш проект и ответим на вопросы.
+                  durationMinutes: 30
+                - id: code-review
+                  name: Ревью кода
+                  description: Совместный разбор пулл-реквеста.
+                  durationMinutes: 45
+                - id: tech-interview
+                  name: Техническое интервью
+                  description: Часовой созвон с задачами и разбором решений.
+                  durationMinutes: 60
+      tags:
+        - Guest
+  /api/event-types/{eventTypeId}:
+    get:
+      operationId: Public_getEventType
+      summary: Тип встречи по id
+      parameters:
+        - name: eventTypeId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EventType'
+        '404':
+          description: Ресурс не найден.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotFoundError'
+      tags:
+        - Guest
+  /api/event-types/{eventTypeId}/slots:
+    get:
+      operationId: Public_listSlots
+      summary: Слоты для записи на ближайшие bookingWindowDays дней
+      description: 'Все слоты в окне записи, отсортированные по времени. Прошедшие слоты не возвращаются; занятые возвращаются с `available: false`.'
+      parameters:
+        - name: eventTypeId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/TimeSlot'
+              example:
+                - startAt: '2026-11-10T06:00:00Z'
+                  endAt: '2026-11-10T06:30:00Z'
+                  available: true
+                - startAt: '2026-11-10T06:30:00Z'
+                  endAt: '2026-11-10T07:00:00Z'
+                  available: false
+                - startAt: '2026-11-10T07:00:00Z'
+                  endAt: '2026-11-10T07:30:00Z'
+                  available: true
+                - startAt: '2026-11-11T08:00:00Z'
+                  endAt: '2026-11-11T08:30:00Z'
+                  available: true
+        '404':
+          description: Ресурс не найден.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotFoundError'
+      tags:
+        - Guest
+  /api/owner:
+    get:
+      operationId: Public_getOwner
+      summary: Профиль владельца календаря
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Owner'
+      tags:
+        - Guest
+components:
+  schemas:
+    BadRequestError:
+      type: object
+      required:
+        - code
+        - message
+      properties:
+        code:
+          type: string
+          enum:
+            - VALIDATION_ERROR
+            - SLOT_UNAVAILABLE
+          description: VALIDATION_ERROR — невалидные поля; SLOT_UNAVAILABLE — время не является свободным слотом (прошло, вне окна записи или рабочих часов, не выровнено по сетке).
+        message:
+          type: string
+        details:
+          type: array
+          items:
+            $ref: '#/components/schemas/FieldError'
+      description: 'Некорректный запрос: невалидные поля или время, которое нельзя забронировать.'
+    Booking:
+      type: object
+      required:
+        - id
+        - eventTypeId
+        - eventTypeName
+        - startAt
+        - endAt
+        - guestName
+        - guestEmail
+        - createdAt
+      properties:
+        id:
+          type: string
+          format: uuid
+        eventTypeId:
+          type: string
+        eventTypeName:
+          type: string
+        startAt:
+          type: string
+          format: date-time
+        endAt:
+          type: string
+          format: date-time
+        guestName:
+          type: string
+        guestEmail:
+          type: string
+        comment:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+      description: Подтверждённая запись на звонок.
+      example:
+        id: 6ba7b810-9dad-41d1-80b4-00c04fd430c8
+        eventTypeId: consultation
+        eventTypeName: Консультация
+        startAt: '2026-11-10T06:00:00Z'
+        endAt: '2026-11-10T06:30:00Z'
+        guestName: Иван Петров
+        guestEmail: ivan@example.com
+        comment: Хочу обсудить архитектуру сервиса
+        createdAt: '2026-11-06T12:00:00Z'
+    ConflictError:
+      type: object
+      required:
+        - code
+        - message
+      properties:
+        code:
+          type: string
+          enum:
+            - SLOT_TAKEN
+            - EVENT_TYPE_ALREADY_EXISTS
+          description: SLOT_TAKEN — время пересекается с существующей записью; EVENT_TYPE_ALREADY_EXISTS — тип с таким id уже есть.
+        message:
+          type: string
+      description: Конфликт с текущим состоянием.
+    CreateBookingRequest:
+      type: object
+      required:
+        - eventTypeId
+        - startAt
+        - guestName
+        - guestEmail
+      properties:
+        eventTypeId:
+          type: string
+        startAt:
+          type: string
+          format: date-time
+        guestName:
+          type: string
+          minLength: 1
+          maxLength: 100
+        guestEmail:
+          type: string
+          maxLength: 254
+          format: email
+        comment:
+          type: string
+          maxLength: 1000
+      description: Запрос гостя на бронирование. `startAt` должен совпадать с началом свободного слота.
+      example:
+        eventTypeId: consultation
+        startAt: '2026-11-10T06:00:00Z'
+        guestName: Иван Петров
+        guestEmail: ivan@example.com
+        comment: Хочу обсудить архитектуру сервиса
+    EventType:
+      type: object
+      required:
+        - id
+        - name
+        - description
+        - durationMinutes
+      properties:
+        id:
+          type: string
+          minLength: 2
+          maxLength: 64
+          pattern: ^[a-z0-9]+(?:-[a-z0-9]+)*$
+          description: Человекочитаемый идентификатор (slug), задаётся владельцем.
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        description:
+          type: string
+          maxLength: 500
+        durationMinutes:
+          type: integer
+          format: int32
+          minimum: 5
+          maximum: 240
+          description: Длительность встречи в минутах.
+      description: Тип встречи, на который гость может записаться.
+      example:
+        id: consultation
+        name: Консультация
+        description: Обсудим ваш проект и ответим на вопросы.
+        durationMinutes: 30
+    FieldError:
+      type: object
+      required:
+        - field
+        - message
+      properties:
+        field:
+          type: string
+        message:
+          type: string
+      description: Ошибка валидации конкретного поля.
+    NotFoundError:
+      type: object
+      required:
+        - code
+        - message
+      properties:
+        code:
+          type: string
+          enum:
+            - NOT_FOUND
+        message:
+          type: string
+      description: Ресурс не найден.
+    Owner:
+      type: object
+      required:
+        - name
+        - timezone
+        - workdayStart
+        - workdayEnd
+        - workingDays
+        - bookingWindowDays
+      properties:
+        name:
+          type: string
+        timezone:
+          type: string
+          description: IANA-часовой пояс владельца, в котором заданы рабочие часы.
+        workdayStart:
+          type: string
+          pattern: ^([01]\d|2[0-3]):[0-5]\d$
+          description: Начало рабочего дня, HH:mm.
+        workdayEnd:
+          type: string
+          pattern: ^([01]\d|2[0-3]):[0-5]\d$
+          description: Конец рабочего дня, HH:mm.
+        workingDays:
+          type: array
+          items:
+            type: integer
+            format: int32
+          description: 'Рабочие дни недели по ISO 8601: 1 — понедельник, 7 — воскресенье.'
+        bookingWindowDays:
+          type: integer
+          format: int32
+          description: На сколько дней вперёд (включая сегодня) открыта запись.
+      description: Профиль владельца календаря (единственный, задаётся конфигурацией сервера).
+      example:
+        name: Анна Смирнова
+        timezone: Europe/Moscow
+        workdayStart: '09:00'
+        workdayEnd: '18:00'
+        workingDays:
+          - 1
+          - 2
+          - 3
+          - 4
+          - 5
+        bookingWindowDays: 14
+    TimeSlot:
+      type: object
+      required:
+        - startAt
+        - endAt
+        - available
+      properties:
+        startAt:
+          type: string
+          format: date-time
+        endAt:
+          type: string
+          format: date-time
+        available:
+          type: boolean
+          description: false — время уже занято другой записью (любого типа).
+      description: 'Слот в расписании для конкретного типа встречи: интервал [startAt, endAt).'
+      example:
+        startAt: '2026-11-10T06:00:00Z'
+        endAt: '2026-11-10T06:30:00Z'
+        available: true
+servers:
+  - url: http://localhost:8080
+    description: Local server
+    variables: {}
