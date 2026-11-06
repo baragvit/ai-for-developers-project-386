@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: call-booking
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /api/owner
+    envVars:
+      - key: OWNER_NAME
+        value: Анна Смирнова
+      - key: OWNER_TIMEZONE
+        value: Europe/Moscow
