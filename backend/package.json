@@ -1,0 +1,30 @@
+{
+  "name": "backend",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/main.ts",
+    "build": "tsc -p tsconfig.build.json",
+    "start": "node dist/main.js",
+    "test": "vitest run",
+    "lint": "oxlint src test",
+    "typecheck": "tsc --noEmit",
+    "gen:api": "openapi-typescript ../api-contract/openapi.yaml -o src/api/model/schema.d.ts"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.5",
+    "openapi-typescript": "^7.13.0",
+    "oxlint": "^1.92.0",
+    "tsx": "^4.23.15",
+    "typescript": "~5.9.3",
+    "vitest": "^5.1.0"
+  },
+  "dependencies": {
+    "@date-fns/tz": "^1.5.0",
+    "@fastify/static": "^10.1.10",
+    "date-fns": "^4.4.0",
+    "fastify": "^5.12.8",
+    "zod": "^4.6.7"
+  }
+}
