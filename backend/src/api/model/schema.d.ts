@@ -216,7 +216,7 @@ export interface components {
             description: string;
             /**
              * Format: int32
-             * @description Длительность встречи в минутах.
+             * @description Длительность встречи в минутах, кратна 5.
              */
             durationMinutes: number;
         };
