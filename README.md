@@ -146,6 +146,17 @@ make e2e            # Playwright: собирает приложение, под�
 
 В GitHub Actions ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) на каждый push запускается `mise run check`, а затем смоук-тест Docker-образа.
 
+## Релизы
+
+Версии и `CHANGELOG.md` выпускает [release-please](https://github.com/googleapis/release-please) из [Conventional Commits](https://www.conventionalcommits.org/ru/). Версия одна на всё приложение — в корневом `package.json`, тег `vX.Y.Z`; пакеты `api-contract`, `backend`, `frontend` и `e2e` в релизе не участвуют.
+
+1. На каждый push в `main` workflow [`.github/workflows/release-please.yml`](.github/workflows/release-please.yml) создаёт или обновляет release PR: новая версия в `package.json` и `package-lock.json` и запись в `CHANGELOG.md`.
+2. Человек проверяет и мержит release PR — тогда создаются тег и GitHub Release. Docker-образ не публикуется.
+
+Как считается версия: первый релиз — `0.1.0`; до `1.0.0` `feat` и breaking change (`feat!`) поднимают minor, `fix` — patch. В CHANGELOG попадают `feat`, `fix`, `perf` и `revert`. Чтобы выпустить `1.0.0`, добавьте в тело коммита строку `Release-As: 1.0.0`. Настройки — в [`release-please-config.json`](release-please-config.json), последняя выпущенная версия — в [`.release-please-manifest.json`](.release-please-manifest.json).
+
+Release PR создаётся с `GITHUB_TOKEN`, поэтому CI на нём не запускается: он меняет только версию и CHANGELOG. Чтобы workflow мог открывать PR, в настройках репозитория включите *Settings → Actions → General → Allow GitHub Actions to create and approve pull requests*.
+
 ## Деплой
 
 Приложение упаковано в один Docker-образ и слушает порт из переменной `PORT`, поэтому подходит для Render, Railway, Fly.io и подобных платформ. Для [Render](https://render.com) есть blueprint [`render.yaml`](render.yaml): создайте Web Service из репозитория, рантайм — Docker.
