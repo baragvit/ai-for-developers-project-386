@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.0](https://github.com/baragvit/ai-for-developers-project-386/compare/v0.1.0...v0.2.0) (2026-11-06)
+
+
+### Features
+
+* deploy to Render via MCP and document Docker run ([#23](https://github.com/baragvit/ai-for-developers-project-386/issues/23)) ([4dd9f41](https://github.com/baragvit/ai-for-developers-project-386/commit/4dd9f411c67dc949f33d26416d90a7cc50daf058))
+
 ## 0.1.0 (2026-11-06)
 
 
