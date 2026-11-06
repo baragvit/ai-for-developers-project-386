@@ -142,6 +142,7 @@ mise run check
 | `lint` | `make lint` | oxlint для фронтенда и бэкенда |
 | `typecheck` | `make typecheck` | tsc во всех пакетах |
 | `test` | `make test` | Vitest: домен, сервисы и API бэкенда, компоненты фронтенда |
+| `check:rule-guard` | `make check-rule-guard` | тесты конфликтов падают, если отключить проверку пересечения (см. ниже) |
 | `e2e` | `make e2e` | Playwright: собирает production-сборку, поднимает сервер и прогоняет сценарии |
 
 Для e2e один раз установите браузер: `cd e2e && npx playwright install --with-deps chromium`. Сервер e2e слушает порт `E2E_PORT` (по умолчанию `7399`); локально уже запущенный на этом порту сервер переиспользуется, поэтому в параллельных копиях репозитория задавайте разные порты: `E2E_PORT=7420 mise run check`.
@@ -154,7 +155,7 @@ mise run check
 | --- | --- | --- |
 | Домен | `backend/test/schedule.test.ts`, `backend/test/overlaps.test.ts` | генерация слотов: окно 14 дней, рабочие дни и часы в поясе владельца, сетка, прошедшие слоты, переход на зимнее время; пересечение полуоткрытых интервалов |
 | Сервисы | `backend/test/booking-service.test.ts`, `backend/test/event-type-service.test.ts` | бронирование и типы встреч через `Result`, без HTTP |
-| API (главная) | `backend/test/api.test.ts`, `backend/test/booking-conflicts.test.ts` | полное Fastify-приложение через `inject`: статусы, тела, коды ошибок, порядок проверок, примыкание, пересечение разных типов, параллельные запросы |
+| API (главная) | `backend/test/api.test.ts`, `backend/test/booking-conflicts.test.ts` | полное Fastify-приложение через `injectChecked`: статусы, тела, коды ошибок, порядок проверок, примыкание, пересечение разных типов, параллельные запросы |
 | Компоненты | `frontend/src/**/*.test.tsx` | Vitest + Testing Library на мокнутом клиенте: раскладка по часовому поясу, пустые состояния, обработка ошибок |
 | Браузер | `e2e/tests/booking.spec.ts` | Playwright против production-сборки с настоящим сервером, без моков API; десктоп и мобильный (Pixel 7) |
 
@@ -164,15 +165,11 @@ API-тесты вызывают сервер через `injectChecked` (`backen
 
 ### Проверка тестов правила неналожения
 
-```bash
-mise run check:rule-guard   # или make check-rule-guard
-```
-
-Команда накладывает патч `scripts/rule-guard/disable-overlap-check.patch`, который отключает проверку пересечения, запускает `backend/test/booking-conflicts.test.ts` и снимает патч при любом исходе. Она успешна, только если упали ровно тесты из `scripts/rule-guard/expected-failures.txt`, а остальные прошли; удалённый или ослабленный тест конфликта и устаревший патч роняют её.
+Шаг `check:rule-guard` команды `mise run check`; отдельно — `mise run check:rule-guard` или `make check-rule-guard`. Он накладывает патч `scripts/rule-guard/disable-overlap-check.patch`, который отключает проверку пересечения, запускает `backend/test/booking-conflicts.test.ts` и снимает патч при любом исходе. Он успешен, только если упали ровно тесты из `scripts/rule-guard/expected-failures.txt`, а остальные прошли; удалённый или ослабленный тест конфликта и устаревший патч роняют его.
 
 ### CI
 
-[`.github/workflows/ci.yml`](.github/workflows/ci.yml) на каждый push и pull request запускает `mise run check`, отдельным шагом `mise run check:rule-guard`, а затем собирает Docker-образ и делает смоук-тест: `/api/owner`, `/api/event-types` и SPA на `/` отвечают.
+[`.github/workflows/ci.yml`](.github/workflows/ci.yml) на каждый push и pull request запускает `mise run check` (в том числе `check:rule-guard`), а затем собирает Docker-образ и делает смоук-тест: `/api/owner`, `/api/event-types` и SPA на `/` отвечают.
 
 ## Релизы
 

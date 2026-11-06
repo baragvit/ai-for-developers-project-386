@@ -34,12 +34,12 @@ npm run contract      # TypeSpec -> OpenAPI -> TS types and backend zod schemas
 npm run mock          # Prism mock on :4010
 npm run dev:backend   # :7341
 npm run dev:frontend  # :5391, proxies /api to API_PROXY_TARGET (default :7341)
-mise run check        # contract:check -> lint -> typecheck -> test -> e2e; same command as CI (make check)
-mise run check:rule-guard  # conflict API tests must fail with the overlap check patched out (separate CI step)
+mise run check        # contract:check -> lint -> typecheck -> test -> check:rule-guard -> e2e; same command as CI (make check)
+mise run check:rule-guard  # conflict API tests must fail with the overlap check patched out (also part of check)
 ```
 
 - e2e starts the production build on `E2E_PORT` (default 7399) and reuses a server already listening there outside CI; give parallel worktrees distinct ports: `E2E_PORT=7420 mise run check`.
-- CI (`.github/workflows/ci.yml`): `mise run check`, then `mise run check:rule-guard`, then a Docker image build with a smoke test.
+- CI (`.github/workflows/ci.yml`): `mise run check`, then a Docker image build with a smoke test.
 - Releases: release-please on push to `main` keeps a release PR (one version in the root `package.json`, one `CHANGELOG.md`, tag `vX.Y.Z`) built from Conventional Commits; a human merges it. Config: `release-please-config.json`, `.release-please-manifest.json`.
 
 ## Tests
