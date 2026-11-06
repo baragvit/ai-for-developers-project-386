@@ -128,6 +128,7 @@ describe('HTTP API', () => {
 
   it.each([
     ['id', 'Bad_Id', 'Только латиница в нижнем регистре, цифры и дефисы'],
+    ['id', ' quick-sync ', 'Только латиница в нижнем регистре, цифры и дефисы'],
     ['id', 'a', 'Не короче 2 символов'],
     ['id', 'a'.repeat(65), 'Не длиннее 64 символов'],
     ['name', '', 'Заполните поле'],
@@ -359,6 +360,7 @@ describe('HTTP API', () => {
       ['comment is too long', { comment: 'я'.repeat(1001) }, 'comment', 'Не длиннее 1000 символов'],
       ['eventTypeId is missing', { eventTypeId: undefined }, 'eventTypeId', 'Обязательное поле'],
       ['startAt is not ISO 8601', { startAt: '9 ноября 9:00' }, 'startAt', 'Дата и время в формате ISO 8601'],
+      ['startAt has surrounding spaces', { startAt: ' 2026-11-09T06:00:00Z ' }, 'startAt', 'Дата и время в формате ISO 8601'],
     ])('answers 400 VALIDATION_ERROR when %s', async (_, override, field, message) => {
       const res = await book({ ...bookingBody, ...override })
 

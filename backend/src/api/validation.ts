@@ -34,11 +34,17 @@ function russianMessage(issue: z.core.$ZodRawIssue): string | undefined {
 
 z.config({ customError: russianMessage })
 
-function trimStrings(body: unknown): unknown {
-  if (typeof body !== 'object' || body === null || Array.isArray(body)) return body
-  return Object.fromEntries(
-    Object.entries(body).map(([key, value]) => [key, typeof value === 'string' ? value.trim() : value]),
-  )
+/** Only free text is trimmed: identifiers and timestamps with stray spaces are invalid input. */
+function trimFields(fields: readonly string[]) {
+  return (body: unknown): unknown => {
+    if (typeof body !== 'object' || body === null || Array.isArray(body)) return body
+    return Object.fromEntries(
+      Object.entries(body).map(([key, value]) => [
+        key,
+        fields.includes(key) && typeof value === 'string' ? value.trim() : value,
+      ]),
+    )
+  }
 }
 
 /** The zod generator drops the contract's `multipleOf`, so the duration step is restated here. */
@@ -46,14 +52,14 @@ const DURATION_STEP_MINUTES = 5
 
 /** Request schemas are generated from the contract; this layer trims text fields and restores dropped rules. */
 export const eventTypeSchema = z.preprocess(
-  trimStrings,
+  trimFields(['name', 'description']),
   zAdminCreateEventTypeBody.extend({
     durationMinutes: zAdminCreateEventTypeBody.shape.durationMinutes.multipleOf(DURATION_STEP_MINUTES),
   }),
 ) satisfies z.ZodType<EventTypeDto>
 
 export const createBookingRequestSchema = z.preprocess(
-  trimStrings,
+  trimFields(['guestName', 'guestEmail', 'comment']),
   zPublicCreateBookingBody,
 ) satisfies z.ZodType<CreateBookingRequestDto>
 
