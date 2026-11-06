@@ -4,7 +4,7 @@ import { Toaster } from '@/components/ui/sonner'
 import { cn } from '@/lib/utils'
 
 const navItems = [
-  { to: '/', label: 'Записаться', shortLabel: 'Записаться', end: true },
+  { to: '/book', label: 'Записаться', shortLabel: 'Записаться', end: false },
   { to: '/admin', label: 'Кабинет владельца', shortLabel: 'Кабинет', end: false },
 ]
 

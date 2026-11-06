@@ -22,7 +22,7 @@ export function AdminPage() {
       <div className="space-y-2">
         <h1 className="text-3xl font-bold tracking-tight">Кабинет владельца</h1>
         <p className="text-muted-foreground">
-          Управляйте форматами встреч и следите за записями. Время показано в часовом поясе{' '}
+          Управляйте типами встреч и следите за записями. Время показано в часовом поясе{' '}
           {localTimeZone()}.
         </p>
       </div>
@@ -61,7 +61,7 @@ export function AdminPage() {
               description="Когда гости запишутся на звонок, встречи появятся здесь одним списком."
               action={
                 <Button asChild variant="outline">
-                  <Link to="/">Открыть страницу записи</Link>
+                  <Link to="/book">Открыть каталог типов встреч</Link>
                 </Button>
               }
             />
@@ -83,7 +83,7 @@ export function AdminPage() {
             <EmptyState
               icon={<CalendarDays />}
               title="Нет ни одного типа встречи"
-              description="Создайте первый формат — например, «Консультация» на 30 минут, — и гости смогут на него записаться."
+              description="Создайте первый тип встречи — например, «Консультация» на 30 минут, — и гости смогут на него записаться."
               action={
                 <Button onClick={() => setCreateOpen(true)}>
                   <Plus />

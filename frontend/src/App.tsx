@@ -5,6 +5,7 @@ import { EmptyState } from '@/components/states'
 import { Button } from '@/components/ui/button'
 import { AdminPage } from '@/pages/admin-page'
 import { BookPage } from '@/pages/book-page'
+import { CatalogPage } from '@/pages/catalog-page'
 import { HomePage } from '@/pages/home-page'
 
 function NotFoundPage() {
@@ -28,6 +29,7 @@ export default function App() {
       <Routes>
         <Route element={<Layout />}>
           <Route index element={<HomePage />} />
+          <Route path="book" element={<CatalogPage />} />
           <Route path="book/:eventTypeId" element={<BookPage />} />
           <Route path="admin" element={<AdminPage />} />
           <Route path="*" element={<NotFoundPage />} />

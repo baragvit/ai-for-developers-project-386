@@ -25,7 +25,7 @@ description = "tsc in all workspaces"
 run = "npm run typecheck"
 
 [tasks.test]
-description = "Backend unit and API tests (Vitest)"
+description = "Backend unit/API tests and frontend component tests (Vitest)"
 run = "npm test"
 
 [tasks.e2e]

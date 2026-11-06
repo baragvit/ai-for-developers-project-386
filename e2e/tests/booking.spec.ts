@@ -2,10 +2,21 @@ import { expect, test } from '@playwright/test'
 import { bookViaApi, createEventType, firstAvailableSlot, moscowTime, selectDay, slotButton } from './support.js'
 
 test.describe('Гость', () => {
-  test('видит форматы встреч с названием, описанием и длительностью', async ({ page, request }) => {
+  test('с главной страницы переходит в каталог типов встреч', async ({ page }) => {
+    await page.goto('/')
+    await expect(page.getByRole('heading', { level: 1, name: 'Запишитесь на звонок' })).toBeVisible()
+    await expect(page.getByRole('region', { name: 'Владелец календаря' })).toBeVisible()
+
+    await page.getByRole('main').getByRole('link', { name: 'Записаться' }).click()
+
+    await expect(page).toHaveURL(/\/book$/)
+    await expect(page.getByRole('heading', { level: 1, name: 'Типы встреч' })).toBeVisible()
+  })
+
+  test('видит в каталоге типы встреч с названием, описанием и длительностью', async ({ page, request }) => {
     const eventType = await createEventType(request, { name: `Знакомство ${Date.now()}`, durationMinutes: 45 })
 
-    await page.goto('/')
+    await page.goto('/book')
 
     const card = page.getByTestId('event-type-card').filter({ hasText: eventType.name })
     await expect(card).toBeVisible()
@@ -18,7 +29,7 @@ test.describe('Гость', () => {
     const slot = await firstAvailableSlot(request, eventType.id)
     const guestName = `Ольга Николаева ${Date.now()}`
 
-    await page.goto('/')
+    await page.goto('/book')
     await page
       .getByTestId('event-type-card')
       .filter({ hasText: eventType.name })
@@ -90,7 +101,7 @@ test.describe('Гость', () => {
 })
 
 test.describe('Владелец', () => {
-  test('создаёт тип встречи, и гости видят его на главной', async ({ page }) => {
+  test('создаёт тип встречи, и гости видят его в каталоге', async ({ page }) => {
     const name = `Менторская сессия ${Date.now()}`
 
     await page.goto('/admin')
@@ -107,7 +118,7 @@ test.describe('Владелец', () => {
     await page.getByRole('tab', { name: /Типы встреч/ }).click()
     await expect(page.getByTestId('admin-event-type').filter({ hasText: name })).toContainText('1 ч')
 
-    await page.goto('/')
+    await page.goto('/book')
     await expect(page.getByTestId('event-type-card').filter({ hasText: name })).toBeVisible()
   })
 

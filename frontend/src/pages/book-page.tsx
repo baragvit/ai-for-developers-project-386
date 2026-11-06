@@ -38,10 +38,10 @@ export function BookPage() {
       <EmptyState
         icon={<CalendarX2 />}
         title="Такой встречи нет"
-        description="Возможно, владелец удалил этот формат или ссылка содержит опечатку."
+        description="Возможно, владелец удалил этот тип встречи или ссылка содержит опечатку."
         action={
           <Button asChild variant="outline">
-            <Link to="/">К списку встреч</Link>
+            <Link to="/book">К типам встреч</Link>
           </Button>
         }
       />
@@ -78,9 +78,9 @@ export function BookPage() {
   return (
     <div className="space-y-6">
       <Button asChild variant="ghost" size="sm" className="-ml-2 text-muted-foreground">
-        <Link to="/">
+        <Link to="/book">
           <ArrowLeft />
-          Все форматы встреч
+          Все типы встреч
         </Link>
       </Button>
 
@@ -178,10 +178,10 @@ function SlotPicker({
       <EmptyState
         icon={<CalendarX2 />}
         title="Свободного времени нет"
-        description="Все слоты на ближайшие две недели заняты. Попробуйте выбрать другой формат встречи или загляните позже."
+        description="Все слоты на ближайшие две недели заняты. Попробуйте выбрать другой тип встречи или загляните позже."
         action={
           <Button asChild variant="outline">
-            <Link to="/">Другие форматы</Link>
+            <Link to="/book">Другие типы встреч</Link>
           </Button>
         }
       />
@@ -387,7 +387,7 @@ function BookingConfirmation({ booking, onBookAnother }: { booking: Booking; onB
             Записаться ещё раз
           </Button>
           <Button asChild>
-            <Link to="/">Другие форматы встреч</Link>
+            <Link to="/book">Другие типы встреч</Link>
           </Button>
         </div>
       </CardContent>
