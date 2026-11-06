@@ -244,32 +244,185 @@ describe('HTTP API', () => {
     expect(upcoming.json()[0].id).toBe(created.json().id)
   })
 
-  it('validates booking requests', async () => {
-    const invalid = await inject({
-      method: 'POST',
-      url: '/api/bookings',
-      payload: { ...bookingBody, guestEmail: 'not-an-email', guestName: '  ' },
-    })
-    expect(invalid.statusCode).toBe(400)
-    expect(invalid.json().details).toEqual([
-      { field: 'guestName', message: 'Заполните поле' },
-      { field: 'guestEmail', message: 'Укажите корректный email' },
-    ])
+  describe('POST /api/bookings', () => {
+    const book = (payload: Record<string, unknown>) => inject({ method: 'POST', url: '/api/bookings', payload })
 
-    const misaligned = await inject({
-      method: 'POST',
-      url: '/api/bookings',
-      payload: { ...bookingBody, startAt: '2026-11-09T06:05:00Z' },
-    })
-    expect(misaligned.statusCode).toBe(400)
-    expect(misaligned.json()).toMatchObject({ code: 'SLOT_UNAVAILABLE' })
+    it('creates a booking ending after the event type duration with a snapshot of its name', async () => {
+      const res = await book({ ...bookingBody, eventTypeId: 'code-review', startAt: '2026-11-09T06:45:00+00:00' })
 
-    const unknownType = await inject({
-      method: 'POST',
-      url: '/api/bookings',
-      payload: { ...bookingBody, eventTypeId: 'missing' },
+      expect(res.statusCode).toBe(201)
+      expect(res.json()).toEqual({
+        id: expect.stringMatching(/^[0-9a-f-]{36}$/),
+        eventTypeId: 'code-review',
+        eventTypeName: 'Ревью кода',
+        startAt: '2026-11-09T06:45:00.000Z',
+        endAt: '2026-11-09T07:30:00.000Z',
+        guestName: 'Иван Петров',
+        guestEmail: 'ivan@example.com',
+        comment: 'Обсудить архитектуру',
+        createdAt: '2026-11-09T05:00:00.000Z',
+      })
     })
-    expect(unknownType.statusCode).toBe(404)
+
+    it('trims guest fields and treats a blank comment as absent', async () => {
+      const res = await book({
+        ...bookingBody,
+        guestName: '  Иван  ',
+        guestEmail: ' ivan@example.com ',
+        comment: '   ',
+      })
+
+      expect(res.statusCode).toBe(201)
+      expect(res.json()).toMatchObject({ guestName: 'Иван', guestEmail: 'ivan@example.com' })
+      expect(res.json()).not.toHaveProperty('comment')
+    })
+
+    it.each([
+      ['guestName is missing', { guestName: undefined }, 'guestName', 'Обязательное поле'],
+      ['guestName is blank', { guestName: '   ' }, 'guestName', 'Заполните поле'],
+      ['guestName is too long', { guestName: 'я'.repeat(101) }, 'guestName', 'Не длиннее 100 символов'],
+      ['guestEmail is missing', { guestEmail: undefined }, 'guestEmail', 'Обязательное поле'],
+      ['guestEmail is not an email', { guestEmail: 'ivan@' }, 'guestEmail', 'Укажите корректный email'],
+      [
+        'guestEmail is too long',
+        { guestEmail: `${'a'.repeat(64)}@${'b'.repeat(186)}.com` },
+        'guestEmail',
+        'Не длиннее 254 символов',
+      ],
+      ['comment is too long', { comment: 'я'.repeat(1001) }, 'comment', 'Не длиннее 1000 символов'],
+      ['eventTypeId is missing', { eventTypeId: undefined }, 'eventTypeId', 'Обязательное поле'],
+      ['startAt is not ISO 8601', { startAt: '9 ноября 9:00' }, 'startAt', 'Дата и время в формате ISO 8601'],
+    ])('answers 400 VALIDATION_ERROR when %s', async (_, override, field, message) => {
+      const res = await book({ ...bookingBody, ...override })
+
+      expect(res.statusCode).toBe(400)
+      expect(res.json()).toEqual({
+        code: 'VALIDATION_ERROR',
+        message: 'Проверьте правильность заполнения полей',
+        details: [{ field, message }],
+      })
+    })
+
+    it('reports every invalid field at once', async () => {
+      const res = await book({ ...bookingBody, guestEmail: 'not-an-email', guestName: '  ' })
+
+      expect(res.statusCode).toBe(400)
+      expect(res.json().details).toEqual([
+        { field: 'guestName', message: 'Заполните поле' },
+        { field: 'guestEmail', message: 'Укажите корректный email' },
+      ])
+    })
+
+    it('answers 404 NOT_FOUND for an unknown event type', async () => {
+      const res = await book({ ...bookingBody, eventTypeId: 'missing' })
+
+      expect(res.statusCode).toBe(404)
+      expect(res.json()).toEqual({ code: 'NOT_FOUND', message: 'Тип встречи «missing» не найден' })
+    })
+
+    it.each([
+      ['in the past', '2026-11-06T06:00:00Z'],
+      ['before the workday starts', '2026-11-09T05:30:00Z'],
+      ['ending after the workday', '2026-11-09T14:45:00Z'],
+      ['at the end of the workday', '2026-11-09T15:00:00Z'],
+      ['on a day off', '2026-11-14T06:00:00Z'],
+      ['after the 14-day window', '2026-11-23T06:00:00Z'],
+      ['off the slot grid', '2026-11-09T06:05:00Z'],
+      ['between two 45-minute slots', '2026-11-09T06:30:00Z', 'code-review'],
+    ])('answers 400 SLOT_UNAVAILABLE for a start %s', async (_, startAt, eventTypeId = 'consultation') => {
+      const res = await book({ ...bookingBody, eventTypeId, startAt })
+
+      expect(res.statusCode).toBe(400)
+      expect(res.json()).toEqual({ code: 'SLOT_UNAVAILABLE', message: 'Это время недоступно для записи' })
+    })
+
+    it('answers 400 SLOT_UNAVAILABLE for a slot that has already started', async () => {
+      await app.close()
+      app = await buildApp({ config: testConfig, clock: () => new Date('2026-11-09T09:10:00Z') })
+
+      const started = await book({ ...bookingBody, startAt: '2026-11-09T09:00:00Z' })
+      const next = await book({ ...bookingBody, startAt: '2026-11-09T09:30:00Z' })
+
+      expect(started.statusCode).toBe(400)
+      expect(started.json()).toMatchObject({ code: 'SLOT_UNAVAILABLE' })
+      expect(next.statusCode).toBe(201)
+    })
+
+    it('checks fields first, then the event type, then the time', async () => {
+      const invalidFieldsOfUnknownType = await book({
+        ...bookingBody,
+        eventTypeId: 'missing',
+        startAt: '2026-11-14T06:00:00Z',
+        guestEmail: 'not-an-email',
+      })
+      expect(invalidFieldsOfUnknownType.statusCode).toBe(400)
+      expect(invalidFieldsOfUnknownType.json()).toMatchObject({ code: 'VALIDATION_ERROR' })
+
+      const unknownTypeAtWrongTime = await book({
+        ...bookingBody,
+        eventTypeId: 'missing',
+        startAt: '2026-11-14T06:00:00Z',
+      })
+      expect(unknownTypeAtWrongTime.statusCode).toBe(404)
+      expect(unknownTypeAtWrongTime.json()).toMatchObject({ code: 'NOT_FOUND' })
+
+      expect((await book(bookingBody)).statusCode).toBe(201)
+      const offGridOverBooking = await book({ ...bookingBody, startAt: '2026-11-09T06:05:00Z' })
+      expect(offGridOverBooking.statusCode).toBe(400)
+      expect(offGridOverBooking.json()).toMatchObject({ code: 'SLOT_UNAVAILABLE' })
+    })
+  })
+
+  describe('GET /api/admin/bookings', () => {
+    let now: Date
+
+    beforeEach(async () => {
+      await app.close()
+      now = MONDAY_8AM_MSK
+      app = await buildApp({ config: testConfig, clock: () => now })
+    })
+
+    const book = async (eventTypeId: string, startAt: string, guestName: string) => {
+      const res = await inject({
+        method: 'POST',
+        url: '/api/bookings',
+        payload: { ...bookingBody, eventTypeId, startAt, guestName },
+      })
+      expect(res.statusCode).toBe(201)
+    }
+
+    const listUpcoming = async () => {
+      const res = await inject({ method: 'GET', url: '/api/admin/bookings' })
+      expect(res.statusCode).toBe(200)
+      return res.json() as { guestName: string; eventTypeName: string; startAt: string }[]
+    }
+
+    it('is empty when nobody has booked', async () => {
+      expect(await listUpcoming()).toEqual([])
+    })
+
+    it('lists bookings of every event type in one list sorted by start time', async () => {
+      await book('tech-interview', '2026-11-10T07:00:00Z', 'Вторник')
+      await book('consultation', '2026-11-09T08:00:00Z', 'Понедельник, 11:00')
+      await book('code-review', '2026-11-09T06:00:00Z', 'Понедельник, 09:00')
+
+      expect((await listUpcoming()).map(({ guestName, eventTypeName }) => [guestName, eventTypeName])).toEqual([
+        ['Понедельник, 09:00', 'Ревью кода'],
+        ['Понедельник, 11:00', 'Консультация'],
+        ['Вторник', 'Техническое интервью'],
+      ])
+    })
+
+    it('keeps a meeting until it ends and drops it afterwards', async () => {
+      await book('tech-interview', '2026-11-09T06:00:00Z', 'Идёт сейчас')
+      await book('consultation', '2026-11-09T08:00:00Z', 'Позже')
+
+      now = new Date('2026-11-09T06:59:59Z')
+      expect((await listUpcoming()).map((booking) => booking.guestName)).toEqual(['Идёт сейчас', 'Позже'])
+
+      now = new Date('2026-11-09T07:00:00Z')
+      expect((await listUpcoming()).map((booking) => booking.guestName)).toEqual(['Позже'])
+    })
   })
 
   it('answers malformed JSON and unknown API routes with JSON errors', async () => {
