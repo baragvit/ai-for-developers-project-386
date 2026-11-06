@@ -3,6 +3,7 @@ import {
   bookViaApi,
   createEventType,
   firstAvailableSlot,
+  halfAnHourLater,
   moscowDate,
   moscowTime,
   selectDay,
@@ -92,32 +93,53 @@ test.describe('Гость', () => {
   })
 
   test('не может выбрать время, занятое встречей другого типа', async ({ page, request }) => {
-    const first = await createEventType(request)
-    const second = await createEventType(request)
-    const slot = await firstAvailableSlot(request, first.id)
-    await bookViaApi(request, first.id, slot.startAt)
+    const hour = await createEventType(request, { durationMinutes: 60 })
+    const halfHour = await createEventType(request)
+    const booked = await firstAvailableSlot(request, hour.id)
+    await bookViaApi(request, hour.id, booked.startAt)
 
-    await page.goto(`/book/${second.id}`)
-    await selectDay(page, slot.startAt)
+    await page.goto(`/book/${halfHour.id}`)
+    await selectDay(page, booked.startAt)
 
-    await expect(slotButton(page, slot.startAt)).toBeDisabled()
+    await expect(slotButton(page, booked.startAt)).toBeDisabled()
+    await expect(slotButton(page, halfAnHourLater(booked.startAt))).toBeDisabled()
   })
 
-  test('получает понятную ошибку, если слот заняли, пока он заполнял форму', async ({ page, request }) => {
+  test('проигрывает гонку за слот, видит свежие слоты и записывается на другое время с теми же данными', async ({
+    page,
+    request,
+  }) => {
     const eventType = await createEventType(request)
-    const slot = await firstAvailableSlot(request, eventType.id)
+    const rivalType = await createEventType(request, { durationMinutes: 60 })
+    const slot = await firstAvailableSlot(request, rivalType.id)
+    const guestName = `Пётр ${Date.now()}`
 
     await page.goto(`/book/${eventType.id}`)
     await selectDay(page, slot.startAt)
     await slotButton(page, slot.startAt).click()
-    await page.getByLabel('Ваше имя').fill('Пётр')
+    await page.getByLabel('Ваше имя').fill(guestName)
     await page.getByLabel('Email').fill('petr@example.com')
+    await page.getByLabel('Комментарий').fill('Про релиз')
 
-    await bookViaApi(request, eventType.id, slot.startAt)
+    await bookViaApi(request, rivalType.id, slot.startAt)
     await page.getByRole('button', { name: 'Записаться' }).click()
 
-    await expect(page.getByText('Это время только что заняли')).toBeVisible()
+    await expect(page.getByText('Это время только что заняли. Выберите другой слот.')).toBeVisible()
     await expect(slotButton(page, slot.startAt)).toBeDisabled()
+    await expect(slotButton(page, halfAnHourLater(slot.startAt))).toBeDisabled()
+
+    const another = await firstAvailableSlot(request, eventType.id)
+    await selectDay(page, another.startAt)
+    await slotButton(page, another.startAt).click()
+    await expect(page.getByLabel('Ваше имя')).toHaveValue(guestName)
+    await expect(page.getByLabel('Email')).toHaveValue('petr@example.com')
+    await expect(page.getByLabel('Комментарий')).toHaveValue('Про релиз')
+
+    await page.getByRole('button', { name: 'Записаться' }).click()
+
+    const confirmation = page.getByTestId('booking-confirmation')
+    await expect(confirmation).toContainText(guestName)
+    await expect(confirmation).toContainText(moscowTime(another.startAt))
   })
 
   test('видит ошибки у полей формы и не записывается, пока они не исправлены', async ({ page, request }) => {

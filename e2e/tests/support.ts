@@ -40,6 +40,8 @@ export async function bookViaApi(request: APIRequestContext, eventTypeId: string
   expect(res.status()).toBe(201)
 }
 
+export const halfAnHourLater = (iso: string) => new Date(new Date(iso).getTime() + 30 * 60_000).toISOString()
+
 const moscowDay = (iso: string) =>
   new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Moscow' }).format(new Date(iso))
 
