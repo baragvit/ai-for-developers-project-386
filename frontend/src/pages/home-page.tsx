@@ -2,8 +2,10 @@ import { ArrowRight, CalendarCheck, CalendarDays, MousePointerClick } from 'luci
 import { Link } from 'react-router'
 import type { Owner } from '@/api/client'
 import { useOwner } from '@/api/queries'
+import { ErrorState } from '@/components/states'
 import { TimeZoneHint } from '@/components/time-zone-hint'
 import { Button } from '@/components/ui/button'
+import { Skeleton } from '@/components/ui/skeleton'
 import { formatDays, formatWorkingDays } from '@/lib/format'
 
 const steps = [
@@ -32,34 +34,50 @@ function initials(name: string): string {
     .join('')
 }
 
-function OwnerCard({ owner }: { owner: Owner }) {
+function OwnerSection() {
+  const owner = useOwner()
+
   return (
     <section aria-labelledby="owner-heading" className="max-w-xl space-y-4">
       <h2 id="owner-heading" className="text-xl font-semibold tracking-tight">
         Владелец календаря
       </h2>
-      <div className="space-y-4 rounded-xl border bg-card p-5 shadow-xs">
-        <div className="flex items-center gap-3">
-          <span className="flex size-10 items-center justify-center rounded-full bg-secondary font-semibold text-secondary-foreground">
-            {initials(owner.name)}
-          </span>
-          <p className="font-medium">{owner.name}</p>
-        </div>
-        <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
-          <dt className="text-muted-foreground">Рабочее время</dt>
-          <dd>{`${formatWorkingDays(owner.workingDays)}, ${owner.workdayStart}–${owner.workdayEnd}`}</dd>
-          <dt className="text-muted-foreground">Часовой пояс</dt>
-          <dd>{owner.timezone}</dd>
-        </dl>
-        <p className="text-sm">{`Запись открыта на ${formatDays(owner.bookingWindowDays)} вперёд`}</p>
-      </div>
+      {owner.error ? (
+        <ErrorState
+          title="Не удалось загрузить данные владельца"
+          message={owner.error.message}
+          onRetry={() => owner.refetch()}
+        />
+      ) : owner.isPending ? (
+        <Skeleton className="h-40 rounded-xl" />
+      ) : (
+        <OwnerCard owner={owner.data} />
+      )}
     </section>
   )
 }
 
-export function HomePage() {
-  const owner = useOwner()
+function OwnerCard({ owner }: { owner: Owner }) {
+  return (
+    <div className="space-y-4 rounded-xl border bg-card p-5 shadow-xs">
+      <div className="flex items-center gap-3">
+        <span className="flex size-10 items-center justify-center rounded-full bg-secondary font-semibold text-secondary-foreground">
+          {initials(owner.name)}
+        </span>
+        <p className="font-medium">{owner.name}</p>
+      </div>
+      <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
+        <dt className="text-muted-foreground">Рабочее время</dt>
+        <dd>{`${formatWorkingDays(owner.workingDays)}, ${owner.workdayStart}–${owner.workdayEnd}`}</dd>
+        <dt className="text-muted-foreground">Часовой пояс</dt>
+        <dd>{owner.timezone}</dd>
+      </dl>
+      <p className="text-sm">{`Запись открыта на ${formatDays(owner.bookingWindowDays)} вперёд`}</p>
+    </div>
+  )
+}
 
+export function HomePage() {
   return (
     <div className="space-y-12">
       <section className="max-w-2xl space-y-5">
@@ -97,7 +115,7 @@ export function HomePage() {
         </ol>
       </section>
 
-      {owner.data && <OwnerCard owner={owner.data} />}
+      <OwnerSection />
     </div>
   )
 }
