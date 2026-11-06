@@ -1,6 +1,6 @@
 import Fastify, { type FastifyInstance } from 'fastify'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { injectChecked } from './contract.js'
+import { createContractChecker, injectChecked } from './contract.js'
 
 describe('injectChecked', () => {
   let app: FastifyInstance
@@ -49,6 +49,28 @@ describe('injectChecked', () => {
   it('fails for a route that is not in the contract', async () => {
     await expect(injectChecked(app, { method: 'GET', url: '/api/undeclared' })).rejects.toThrow(
       /No operation in the contract/,
+    )
+  })
+
+  it('fails for a status covered only by a default response', async () => {
+    const contract = createContractChecker({
+      paths: {
+        '/api/failing': {
+          get: {
+            operationId: 'failing',
+            responses: {
+              '200': {},
+              default: { content: { 'application/json': { schema: { type: 'object' } } } },
+            },
+          },
+        },
+      },
+      components: {},
+    })
+    app.get('/api/failing', async (_req, res) => res.code(500).send({ code: 'INTERNAL' }))
+
+    await expect(contract.injectChecked(app, { method: 'GET', url: '/api/failing' })).rejects.toThrow(
+      /failing does not declare status 500/,
     )
   })
 })
