@@ -1,0 +1,9 @@
+# Tests of backend/test/booking-conflicts.test.ts that must fail while the overlap check is disabled.
+# Every other test of the file must still pass. One full test name per line.
+booking conflicts rejects a shorter booking of another event type inside an existing one with 409 SLOT_TAKEN
+booking conflicts rejects a longer booking covering it
+booking conflicts rejects a booking overlapping its end
+booking conflicts rejects a booking overlapping its start
+booking conflicts rejects a booking of the same time
+booking conflicts marks slots of other event types overlapping a booking as unavailable
+booking conflicts lets exactly one of simultaneous overlapping requests win, even for different event types

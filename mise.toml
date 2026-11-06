@@ -42,6 +42,10 @@ run = "npm test"
 description = "Playwright scenarios against the production build"
 run = "npm run test:e2e"
 
+[tasks."check:rule-guard"]
+description = "Fail unless the conflict API tests fail with the overlap check patched out"
+run = "scripts/rule-guard/check.sh"
+
 [tasks.check]
 description = "All checks, locally and in CI"
 run = [
