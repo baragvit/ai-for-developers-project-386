@@ -25,6 +25,8 @@ function russianMessage(issue: z.core.$ZodRawIssue): string | undefined {
       if (issue.format === 'email') return 'Укажите корректный email'
       if (issue.format === 'datetime') return 'Дата и время в формате ISO 8601'
       return patternMessages[String(issue.path?.[0])] ?? 'Неверный формат'
+    case 'not_multiple_of':
+      return `Должно быть кратно ${issue.divisor}`
     default:
       return 'Некорректное значение'
   }
@@ -39,8 +41,16 @@ function trimStrings(body: unknown): unknown {
   )
 }
 
-/** Request schemas are generated from the contract; this layer only trims text fields. */
-export const eventTypeSchema = z.preprocess(trimStrings, zAdminCreateEventTypeBody) satisfies z.ZodType<EventTypeDto>
+/** The zod generator drops the contract's `multipleOf`, so the duration step is restated here. */
+const DURATION_STEP_MINUTES = 5
+
+/** Request schemas are generated from the contract; this layer trims text fields and restores dropped rules. */
+export const eventTypeSchema = z.preprocess(
+  trimStrings,
+  zAdminCreateEventTypeBody.extend({
+    durationMinutes: zAdminCreateEventTypeBody.shape.durationMinutes.multipleOf(DURATION_STEP_MINUTES),
+  }),
+) satisfies z.ZodType<EventTypeDto>
 
 export const createBookingRequestSchema = z.preprocess(
   trimStrings,

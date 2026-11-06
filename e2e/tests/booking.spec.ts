@@ -201,6 +201,11 @@ test.describe('Владелец', () => {
     await dialog.getByLabel('Идентификатор').fill(existing.id)
     await dialog.getByRole('button', { name: 'Создать' }).click()
 
-    await expect(dialog.getByText('Такой id уже занят')).toBeVisible()
+    await expect(dialog.getByLabel('Идентификатор')).toHaveAccessibleDescription(/Такой id уже занят/)
+    await expect(dialog).toBeVisible()
+
+    await page.goto('/book')
+    await expect(page.getByTestId('event-type-card').filter({ hasText: existing.name })).toBeVisible()
+    await expect(page.getByTestId('event-type-card').filter({ hasText: 'Дубликат' })).toHaveCount(0)
   })
 })

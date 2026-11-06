@@ -1,6 +1,7 @@
 import "@typespec/http";
 import "@typespec/openapi";
 import "@typespec/openapi3";
+import "@typespec/json-schema";
 
 using Http;
 using OpenAPI;
@@ -74,9 +75,10 @@ model EventType {
   @maxLength(500)
   description: string;
 
-  @doc("Длительность встречи в минутах.")
+  @doc("Длительность встречи в минутах, кратна 5.")
   @minValue(5)
   @maxValue(240)
+  @JsonSchema.multipleOf(5)
   durationMinutes: int32;
 }
 

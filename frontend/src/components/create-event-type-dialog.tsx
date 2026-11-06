@@ -14,10 +14,12 @@ import {
 import { FormField } from '@/components/form-field'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
+import { errorProps } from '@/lib/field-error'
 import { SLUG_PATTERN, slugify } from '@/lib/slug'
 import { cn } from '@/lib/utils'
 
 const DURATION_PRESETS = [15, 30, 45, 60]
+const DURATION_STEP_MINUTES = 5
 
 type Values = { name: string; id: string; durationMinutes: string; description: string }
 type Errors = Partial<Record<keyof Values, string>>
@@ -35,6 +37,8 @@ function validate(values: Values): Errors {
   const duration = Number(values.durationMinutes)
   if (!Number.isInteger(duration) || duration < 5 || duration > 240) {
     errors.durationMinutes = 'Целое число от 5 до 240 минут'
+  } else if (duration % DURATION_STEP_MINUTES !== 0) {
+    errors.durationMinutes = 'Длительность должна быть кратна 5 минутам'
   }
 
   if (values.description.length > 500) errors.description = 'Не длиннее 500 символов'
@@ -124,7 +128,7 @@ export function CreateEventTypeDialog({
               id="et-name"
               placeholder="Консультация"
               value={values.name}
-              aria-invalid={Boolean(errors.name)}
+              {...errorProps('et-name', errors.name)}
               onChange={(e) => update('name', e.target.value)}
             />
           </FormField>
@@ -140,7 +144,7 @@ export function CreateEventTypeDialog({
               className="font-mono"
               placeholder="consultation"
               value={values.id}
-              aria-invalid={Boolean(errors.id)}
+              {...errorProps('et-id', errors.id)}
               onChange={(e) => {
                 setIdTouched(true)
                 update('id', e.target.value.toLowerCase())
@@ -155,10 +159,10 @@ export function CreateEventTypeDialog({
                 type="number"
                 min={5}
                 max={240}
-                step={5}
+                step={DURATION_STEP_MINUTES}
                 className="w-24"
                 value={values.durationMinutes}
-                aria-invalid={Boolean(errors.durationMinutes)}
+                {...errorProps('et-duration', errors.durationMinutes)}
                 onChange={(e) => update('durationMinutes', e.target.value)}
               />
               {DURATION_PRESETS.map((minutes) => (
@@ -185,7 +189,7 @@ export function CreateEventTypeDialog({
               rows={3}
               placeholder="О чём будет встреча и как к ней подготовиться"
               value={values.description}
-              aria-invalid={Boolean(errors.description)}
+              {...errorProps('et-description', errors.description)}
               onChange={(e) => update('description', e.target.value)}
             />
           </FormField>

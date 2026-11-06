@@ -124,6 +124,73 @@ describe('HTTP API', () => {
     expect(invalid.json().details).toHaveLength(3)
   })
 
+  const validEventType = { id: 'quick-sync', name: 'Быстрый созвон', description: '', durationMinutes: 15 }
+
+  it.each([
+    ['id', 'Bad_Id', 'Только латиница в нижнем регистре, цифры и дефисы'],
+    ['id', 'a', 'Не короче 2 символов'],
+    ['id', 'a'.repeat(65), 'Не длиннее 64 символов'],
+    ['name', '', 'Заполните поле'],
+    ['name', 'я'.repeat(101), 'Не длиннее 100 символов'],
+    ['description', 'я'.repeat(501), 'Не длиннее 500 символов'],
+    ['durationMinutes', 0, 'Не меньше 5'],
+    ['durationMinutes', 245, 'Не больше 240'],
+    ['durationMinutes', 7, 'Должно быть кратно 5'],
+    ['durationMinutes', 12.5, 'Укажите целое число'],
+  ])('rejects an event type whose %s is %j', async (field, value, message) => {
+    const res = await inject({
+      method: 'POST',
+      url: '/api/admin/event-types',
+      payload: { ...validEventType, [field]: value },
+    })
+    expect(res.statusCode).toBe(400)
+    expect(res.json()).toEqual({
+      code: 'VALIDATION_ERROR',
+      message: 'Проверьте правильность заполнения полей',
+      details: [{ field, message }],
+    })
+  })
+
+  it('accepts event types at the field limits', async () => {
+    const payload = {
+      id: `a${'-b'.repeat(31)}c`,
+      name: 'я'.repeat(100),
+      description: 'я'.repeat(500),
+      durationMinutes: 240,
+    }
+    const longest = await inject({ method: 'POST', url: '/api/admin/event-types', payload })
+    expect(longest.statusCode).toBe(201)
+    expect(longest.json()).toEqual(payload)
+
+    const shortest = await inject({
+      method: 'POST',
+      url: '/api/admin/event-types',
+      payload: { id: 'ab', name: 'я', description: '', durationMinutes: 5 },
+    })
+    expect(shortest.statusCode).toBe(201)
+  })
+
+  it('checks fields before the id is unique', async () => {
+    const res = await inject({
+      method: 'POST',
+      url: '/api/admin/event-types',
+      payload: { id: 'consultation', name: '', description: '', durationMinutes: 30 },
+    })
+    expect(res.statusCode).toBe(400)
+    expect(res.json().details).toEqual([{ field: 'name', message: 'Заполните поле' }])
+  })
+
+  it('makes a new event type available to guests', async () => {
+    await inject({ method: 'POST', url: '/api/admin/event-types', payload: validEventType })
+
+    const one = await inject({ method: 'GET', url: '/api/event-types/quick-sync' })
+    expect(one.statusCode).toBe(200)
+    expect(one.json()).toEqual(validEventType)
+
+    const list = await inject({ method: 'GET', url: '/api/event-types' })
+    expect(list.json().map((eventType: { id: string }) => eventType.id)).toContain('quick-sync')
+  })
+
   it('trims text fields of a new event type and requires every contract field', async () => {
     const created = await inject({
       method: 'POST',
