@@ -2,7 +2,9 @@ import { expect, test } from '@playwright/test'
 import { bookViaApi, createEventType, firstAvailableSlot, moscowTime, selectDay, slotButton } from './support.js'
 
 test.describe('Гость', () => {
-  test('с главной страницы переходит в каталог типов встреч', async ({ page }) => {
+  test('с главной страницы переходит в каталог и видит типы встреч', async ({ page, request }) => {
+    const eventType = await createEventType(request, { durationMinutes: 60 })
+
     await page.goto('/')
     await expect(page.getByRole('heading', { level: 1, name: 'Запишитесь на звонок' })).toBeVisible()
     await expect(page.getByRole('region', { name: 'Владелец календаря' })).toBeVisible()
@@ -11,16 +13,9 @@ test.describe('Гость', () => {
 
     await expect(page).toHaveURL(/\/book$/)
     await expect(page.getByRole('heading', { level: 1, name: 'Типы встреч' })).toBeVisible()
-  })
-
-  test('видит в каталоге типы встреч с названием, описанием и длительностью', async ({ page, request }) => {
-    const eventType = await createEventType(request, { name: `Знакомство ${Date.now()}`, durationMinutes: 45 })
-
-    await page.goto('/book')
-
     const card = page.getByTestId('event-type-card').filter({ hasText: eventType.name })
     await expect(card).toBeVisible()
-    await expect(card).toContainText('45 мин')
+    await expect(card).toContainText('1 ч')
     await expect(card).toContainText(eventType.description)
   })
 
