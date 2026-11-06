@@ -6,15 +6,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { buildApp } from '../src/app.js'
 import { loadConfig } from '../src/config.js'
 import { injectChecked } from './contract.js'
-import { MONDAY_8AM_MSK, testConfig } from './helpers.js'
-
-const bookingBody = {
-  eventTypeId: 'consultation',
-  startAt: '2026-11-09T06:00:00Z',
-  guestName: 'Иван Петров',
-  guestEmail: 'ivan@example.com',
-  comment: 'Обсудить архитектуру',
-}
+import { book, bookingBody, listSlots, MONDAY_8AM_MSK, postBooking, testConfig } from './helpers.js'
 
 describe('GET /api/owner', () => {
   const getOwner = async (env: NodeJS.ProcessEnv) => {
@@ -71,10 +63,8 @@ describe('HTTP API', () => {
     await app.close()
   })
 
-  const inject = (options: Parameters<typeof injectChecked>[1]) => injectChecked(app, options)
-
   it('lists event types and returns one by id', async () => {
-    const list = await inject({ method: 'GET', url: '/api/event-types' })
+    const list = await injectChecked(app, { method: 'GET', url: '/api/event-types' })
     expect(list.statusCode).toBe(200)
     expect(list.json().map((eventType: { id: string }) => eventType.id)).toEqual([
       'consultation',
@@ -88,10 +78,10 @@ describe('HTTP API', () => {
       durationMinutes: 30,
     })
 
-    const one = await inject({ method: 'GET', url: '/api/event-types/code-review' })
+    const one = await injectChecked(app, { method: 'GET', url: '/api/event-types/code-review' })
     expect(one.json()).toMatchObject({ id: 'code-review', durationMinutes: 45 })
 
-    const missing = await inject({ method: 'GET', url: '/api/event-types/nope' })
+    const missing = await injectChecked(app, { method: 'GET', url: '/api/event-types/nope' })
     expect(missing.statusCode).toBe(404)
     expect(missing.json()).toMatchObject({ code: 'NOT_FOUND' })
   })
@@ -99,15 +89,15 @@ describe('HTTP API', () => {
   it('creates an event type and rejects duplicates and invalid input', async () => {
     const payload = { id: 'quick-sync', name: 'Быстрый созвон', description: '', durationMinutes: 15 }
 
-    const created = await inject({ method: 'POST', url: '/api/admin/event-types', payload })
+    const created = await injectChecked(app, { method: 'POST', url: '/api/admin/event-types', payload })
     expect(created.statusCode).toBe(201)
     expect(created.json()).toEqual(payload)
 
-    const duplicate = await inject({ method: 'POST', url: '/api/admin/event-types', payload })
+    const duplicate = await injectChecked(app, { method: 'POST', url: '/api/admin/event-types', payload })
     expect(duplicate.statusCode).toBe(409)
     expect(duplicate.json()).toMatchObject({ code: 'EVENT_TYPE_ALREADY_EXISTS' })
 
-    const invalid = await inject({
+    const invalid = await injectChecked(app, {
       method: 'POST',
       url: '/api/admin/event-types',
       payload: { id: 'Bad Id', name: '', description: '', durationMinutes: 1000 },
@@ -139,7 +129,7 @@ describe('HTTP API', () => {
     ['durationMinutes', 7, 'Должно быть кратно 5'],
     ['durationMinutes', 12.5, 'Укажите целое число'],
   ])('rejects an event type whose %s is %j', async (field, value, message) => {
-    const res = await inject({
+    const res = await injectChecked(app, {
       method: 'POST',
       url: '/api/admin/event-types',
       payload: { ...validEventType, [field]: value },
@@ -159,11 +149,11 @@ describe('HTTP API', () => {
       description: 'я'.repeat(500),
       durationMinutes: 240,
     }
-    const longest = await inject({ method: 'POST', url: '/api/admin/event-types', payload })
+    const longest = await injectChecked(app, { method: 'POST', url: '/api/admin/event-types', payload })
     expect(longest.statusCode).toBe(201)
     expect(longest.json()).toEqual(payload)
 
-    const shortest = await inject({
+    const shortest = await injectChecked(app, {
       method: 'POST',
       url: '/api/admin/event-types',
       payload: { id: 'ab', name: 'я', description: '', durationMinutes: 5 },
@@ -172,7 +162,7 @@ describe('HTTP API', () => {
   })
 
   it('checks fields before the id is unique', async () => {
-    const res = await inject({
+    const res = await injectChecked(app, {
       method: 'POST',
       url: '/api/admin/event-types',
       payload: { id: 'consultation', name: '', description: '', durationMinutes: 30 },
@@ -182,18 +172,18 @@ describe('HTTP API', () => {
   })
 
   it('makes a new event type available to guests', async () => {
-    await inject({ method: 'POST', url: '/api/admin/event-types', payload: validEventType })
+    await injectChecked(app, { method: 'POST', url: '/api/admin/event-types', payload: validEventType })
 
-    const one = await inject({ method: 'GET', url: '/api/event-types/quick-sync' })
+    const one = await injectChecked(app, { method: 'GET', url: '/api/event-types/quick-sync' })
     expect(one.statusCode).toBe(200)
     expect(one.json()).toEqual(validEventType)
 
-    const list = await inject({ method: 'GET', url: '/api/event-types' })
+    const list = await injectChecked(app, { method: 'GET', url: '/api/event-types' })
     expect(list.json().map((eventType: { id: string }) => eventType.id)).toContain('quick-sync')
   })
 
   it('trims text fields of a new event type and requires every contract field', async () => {
-    const created = await inject({
+    const created = await injectChecked(app, {
       method: 'POST',
       url: '/api/admin/event-types',
       payload: { id: 'trimmed', name: '  Созвон  ', description: ' Коротко ', durationMinutes: 15 },
@@ -201,7 +191,7 @@ describe('HTTP API', () => {
     expect(created.statusCode).toBe(201)
     expect(created.json()).toMatchObject({ name: 'Созвон', description: 'Коротко' })
 
-    const incomplete = await inject({
+    const incomplete = await injectChecked(app, {
       method: 'POST',
       url: '/api/admin/event-types',
       payload: { id: 'incomplete', name: 'Созвон', durationMinutes: 'долго' },
@@ -214,15 +204,8 @@ describe('HTTP API', () => {
   })
 
   describe('slots', () => {
-    type SlotDto = { startAt: string; endAt: string; available: boolean }
-    const listSlots = async (eventTypeId: string) => {
-      const res = await inject({ method: 'GET', url: `/api/event-types/${eventTypeId}/slots` })
-      expect(res.statusCode).toBe(200)
-      return res.json() as SlotDto[]
-    }
-
     it('returns the whole window of slots sized by the event type, sorted by time', async () => {
-      const slots = await listSlots('consultation')
+      const slots = await listSlots(app, 'consultation')
 
       // Monday 9 – Friday 20 November: 10 working days, 18 half-hour slots each.
       expect(slots).toHaveLength(180)
@@ -242,7 +225,7 @@ describe('HTTP API', () => {
     })
 
     it('ends the 45-minute grid of a workday at 17:15', async () => {
-      const monday = (await listSlots('code-review')).filter((slot) => slot.startAt.startsWith('2026-11-09'))
+      const monday = (await listSlots(app, 'code-review')).filter((slot) => slot.startAt.startsWith('2026-11-09'))
 
       expect(monday).toHaveLength(12)
       expect(monday.at(-1)).toEqual({
@@ -256,67 +239,26 @@ describe('HTTP API', () => {
       await app.close()
       app = await buildApp({ config: testConfig, clock: () => new Date('2026-11-09T09:10:00Z') })
 
-      const slots = await listSlots('consultation')
+      const slots = await listSlots(app, 'consultation')
 
       expect(slots[0]!.startAt).toBe('2026-11-09T09:30:00.000Z')
     })
 
-    it('marks slots overlapping a booking of any event type as unavailable', async () => {
-      const booked = await inject({
-        method: 'POST',
-        url: '/api/bookings',
-        payload: { ...bookingBody, eventTypeId: 'tech-interview' },
-      })
-      expect(booked.statusCode).toBe(201)
-
-      const slots = await listSlots('consultation')
-
-      expect(slots).toHaveLength(180)
-      expect(slots.slice(0, 3)).toEqual([
-        { startAt: '2026-11-09T06:00:00.000Z', endAt: '2026-11-09T06:30:00.000Z', available: false },
-        { startAt: '2026-11-09T06:30:00.000Z', endAt: '2026-11-09T07:00:00.000Z', available: false },
-        { startAt: '2026-11-09T07:00:00.000Z', endAt: '2026-11-09T07:30:00.000Z', available: true },
-      ])
-    })
-
     it('answers 404 for an unknown event type', async () => {
-      const res = await inject({ method: 'GET', url: '/api/event-types/nope/slots' })
+      const res = await injectChecked(app, { method: 'GET', url: '/api/event-types/nope/slots' })
 
       expect(res.statusCode).toBe(404)
       expect(res.json()).toMatchObject({ code: 'NOT_FOUND' })
     })
   })
 
-  it('books a slot, refuses to double-book it and shows it to the owner', async () => {
-    const created = await inject({ method: 'POST', url: '/api/bookings', payload: bookingBody })
-    expect(created.statusCode).toBe(201)
-    expect(created.json()).toMatchObject({
-      eventTypeId: 'consultation',
-      eventTypeName: 'Консультация',
-      startAt: '2026-11-09T06:00:00.000Z',
-      endAt: '2026-11-09T06:30:00.000Z',
-      guestName: 'Иван Петров',
-      comment: 'Обсудить архитектуру',
-    })
-
-    const overlapping = await inject({
-      method: 'POST',
-      url: '/api/bookings',
-      payload: { ...bookingBody, eventTypeId: 'tech-interview' },
-    })
-    expect(overlapping.statusCode).toBe(409)
-    expect(overlapping.json()).toMatchObject({ code: 'SLOT_TAKEN' })
-
-    const upcoming = await inject({ method: 'GET', url: '/api/admin/bookings' })
-    expect(upcoming.json()).toHaveLength(1)
-    expect(upcoming.json()[0].id).toBe(created.json().id)
-  })
-
   describe('POST /api/bookings', () => {
-    const book = (payload: Record<string, unknown>) => inject({ method: 'POST', url: '/api/bookings', payload })
-
     it('creates a booking ending after the event type duration with a snapshot of its name', async () => {
-      const res = await book({ ...bookingBody, eventTypeId: 'code-review', startAt: '2026-11-09T06:45:00+00:00' })
+      const res = await postBooking(app, {
+        ...bookingBody,
+        eventTypeId: 'code-review',
+        startAt: '2026-11-09T06:45:00+00:00',
+      })
 
       expect(res.statusCode).toBe(201)
       expect(res.json()).toEqual({
@@ -333,7 +275,7 @@ describe('HTTP API', () => {
     })
 
     it('trims guest fields and treats a blank comment as absent', async () => {
-      const res = await book({
+      const res = await postBooking(app, {
         ...bookingBody,
         guestName: '  Иван  ',
         guestEmail: ' ivan@example.com ',
@@ -360,9 +302,14 @@ describe('HTTP API', () => {
       ['comment is too long', { comment: 'я'.repeat(1001) }, 'comment', 'Не длиннее 1000 символов'],
       ['eventTypeId is missing', { eventTypeId: undefined }, 'eventTypeId', 'Обязательное поле'],
       ['startAt is not ISO 8601', { startAt: '9 ноября 9:00' }, 'startAt', 'Дата и время в формате ISO 8601'],
-      ['startAt has surrounding spaces', { startAt: ' 2026-11-09T06:00:00Z ' }, 'startAt', 'Дата и время в формате ISO 8601'],
+      [
+        'startAt has surrounding spaces',
+        { startAt: ' 2026-11-09T06:00:00Z ' },
+        'startAt',
+        'Дата и время в формате ISO 8601',
+      ],
     ])('answers 400 VALIDATION_ERROR when %s', async (_, override, field, message) => {
-      const res = await book({ ...bookingBody, ...override })
+      const res = await postBooking(app, { ...bookingBody, ...override })
 
       expect(res.statusCode).toBe(400)
       expect(res.json()).toEqual({
@@ -373,7 +320,7 @@ describe('HTTP API', () => {
     })
 
     it('reports every invalid field at once', async () => {
-      const res = await book({ ...bookingBody, guestEmail: 'not-an-email', guestName: '  ' })
+      const res = await postBooking(app, { ...bookingBody, guestEmail: 'not-an-email', guestName: '  ' })
 
       expect(res.statusCode).toBe(400)
       expect(res.json().details).toEqual([
@@ -383,7 +330,7 @@ describe('HTTP API', () => {
     })
 
     it('answers 404 NOT_FOUND for an unknown event type', async () => {
-      const res = await book({ ...bookingBody, eventTypeId: 'missing' })
+      const res = await postBooking(app, { ...bookingBody, eventTypeId: 'missing' })
 
       expect(res.statusCode).toBe(404)
       expect(res.json()).toEqual({ code: 'NOT_FOUND', message: 'Тип встречи «missing» не найден' })
@@ -399,7 +346,7 @@ describe('HTTP API', () => {
       ['off the slot grid', '2026-11-09T06:05:00Z'],
       ['between two 45-minute slots', '2026-11-09T06:30:00Z', 'code-review'],
     ])('answers 400 SLOT_UNAVAILABLE for a start %s', async (_, startAt, eventTypeId = 'consultation') => {
-      const res = await book({ ...bookingBody, eventTypeId, startAt })
+      const res = await postBooking(app, { ...bookingBody, eventTypeId, startAt })
 
       expect(res.statusCode).toBe(400)
       expect(res.json()).toEqual({ code: 'SLOT_UNAVAILABLE', message: 'Это время недоступно для записи' })
@@ -409,8 +356,8 @@ describe('HTTP API', () => {
       await app.close()
       app = await buildApp({ config: testConfig, clock: () => new Date('2026-11-09T09:10:00Z') })
 
-      const started = await book({ ...bookingBody, startAt: '2026-11-09T09:00:00Z' })
-      const next = await book({ ...bookingBody, startAt: '2026-11-09T09:30:00Z' })
+      const started = await postBooking(app, { ...bookingBody, startAt: '2026-11-09T09:00:00Z' })
+      const next = await postBooking(app, { ...bookingBody, startAt: '2026-11-09T09:30:00Z' })
 
       expect(started.statusCode).toBe(400)
       expect(started.json()).toMatchObject({ code: 'SLOT_UNAVAILABLE' })
@@ -418,7 +365,7 @@ describe('HTTP API', () => {
     })
 
     it('checks fields first, then the event type, then the time', async () => {
-      const invalidFieldsOfUnknownType = await book({
+      const invalidFieldsOfUnknownType = await postBooking(app, {
         ...bookingBody,
         eventTypeId: 'missing',
         startAt: '2026-11-14T06:00:00Z',
@@ -427,7 +374,7 @@ describe('HTTP API', () => {
       expect(invalidFieldsOfUnknownType.statusCode).toBe(400)
       expect(invalidFieldsOfUnknownType.json()).toMatchObject({ code: 'VALIDATION_ERROR' })
 
-      const unknownTypeAtWrongTime = await book({
+      const unknownTypeAtWrongTime = await postBooking(app, {
         ...bookingBody,
         eventTypeId: 'missing',
         startAt: '2026-11-14T06:00:00Z',
@@ -435,8 +382,8 @@ describe('HTTP API', () => {
       expect(unknownTypeAtWrongTime.statusCode).toBe(404)
       expect(unknownTypeAtWrongTime.json()).toMatchObject({ code: 'NOT_FOUND' })
 
-      expect((await book(bookingBody)).statusCode).toBe(201)
-      const offGridOverBooking = await book({ ...bookingBody, startAt: '2026-11-09T06:05:00Z' })
+      expect((await postBooking(app, bookingBody)).statusCode).toBe(201)
+      const offGridOverBooking = await postBooking(app, { ...bookingBody, startAt: '2026-11-09T06:05:00Z' })
       expect(offGridOverBooking.statusCode).toBe(400)
       expect(offGridOverBooking.json()).toMatchObject({ code: 'SLOT_UNAVAILABLE' })
     })
@@ -451,17 +398,8 @@ describe('HTTP API', () => {
       app = await buildApp({ config: testConfig, clock: () => now })
     })
 
-    const book = async (eventTypeId: string, startAt: string, guestName: string) => {
-      const res = await inject({
-        method: 'POST',
-        url: '/api/bookings',
-        payload: { ...bookingBody, eventTypeId, startAt, guestName },
-      })
-      expect(res.statusCode).toBe(201)
-    }
-
     const listUpcoming = async () => {
-      const res = await inject({ method: 'GET', url: '/api/admin/bookings' })
+      const res = await injectChecked(app, { method: 'GET', url: '/api/admin/bookings' })
       expect(res.statusCode).toBe(200)
       return res.json() as { guestName: string; eventTypeName: string; startAt: string }[]
     }
@@ -471,9 +409,9 @@ describe('HTTP API', () => {
     })
 
     it('lists bookings of every event type in one list sorted by start time', async () => {
-      await book('tech-interview', '2026-11-10T07:00:00Z', 'Вторник')
-      await book('consultation', '2026-11-09T08:00:00Z', 'Понедельник, 11:00')
-      await book('code-review', '2026-11-09T06:00:00Z', 'Понедельник, 09:00')
+      expect((await book(app, 'tech-interview', '2026-11-10T07:00:00Z', 'Вторник')).statusCode).toBe(201)
+      expect((await book(app, 'consultation', '2026-11-09T08:00:00Z', 'Понедельник, 11:00')).statusCode).toBe(201)
+      expect((await book(app, 'code-review', '2026-11-09T06:00:00Z', 'Понедельник, 09:00')).statusCode).toBe(201)
 
       expect((await listUpcoming()).map(({ guestName, eventTypeName }) => [guestName, eventTypeName])).toEqual([
         ['Понедельник, 09:00', 'Ревью кода'],
@@ -483,8 +421,8 @@ describe('HTTP API', () => {
     })
 
     it('keeps a meeting until it ends and drops it afterwards', async () => {
-      await book('tech-interview', '2026-11-09T06:00:00Z', 'Идёт сейчас')
-      await book('consultation', '2026-11-09T08:00:00Z', 'Позже')
+      expect((await book(app, 'tech-interview', '2026-11-09T06:00:00Z', 'Идёт сейчас')).statusCode).toBe(201)
+      expect((await book(app, 'consultation', '2026-11-09T08:00:00Z', 'Позже')).statusCode).toBe(201)
 
       now = new Date('2026-11-09T06:59:59Z')
       expect((await listUpcoming()).map((booking) => booking.guestName)).toEqual(['Идёт сейчас', 'Позже'])
@@ -495,7 +433,7 @@ describe('HTTP API', () => {
   })
 
   it('answers malformed JSON and unknown API routes with JSON errors', async () => {
-    const malformed = await inject({
+    const malformed = await injectChecked(app, {
       method: 'POST',
       url: '/api/bookings',
       headers: { 'content-type': 'application/json' },

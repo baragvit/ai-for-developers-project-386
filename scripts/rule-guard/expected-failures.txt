@@ -5,5 +5,6 @@ booking conflicts rejects a longer booking covering it
 booking conflicts rejects a booking overlapping its end
 booking conflicts rejects a booking overlapping its start
 booking conflicts rejects a booking of the same time
+booking conflicts rejects a booking of another event type at the same start
 booking conflicts marks slots of other event types overlapping a booking as unavailable
 booking conflicts lets exactly one of simultaneous overlapping requests win, even for different event types
