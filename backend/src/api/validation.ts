@@ -1,41 +1,51 @@
 import { z } from 'zod'
 import type { CreateBookingRequestDto, EventTypeDto, FieldErrorDto } from './model/index.js'
+import { zAdminCreateEventTypeBody, zPublicCreateBookingBody } from './model/zod/zod.gen.js'
 
-/** Request schemas mirror the constraints declared in api-contract/main.tsp. */
-export const eventTypeSchema = z.object({
-  id: z
-    .string({ error: 'Обязательное поле' })
-    .min(2, 'От 2 до 64 символов')
-    .max(64, 'От 2 до 64 символов')
-    .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, 'Только латиница в нижнем регистре, цифры и дефисы'),
-  name: z
-    .string({ error: 'Обязательное поле' })
-    .trim()
-    .min(1, 'Укажите название')
-    .max(100, 'Не длиннее 100 символов'),
-  description: z.string({ error: 'Обязательное поле' }).trim().max(500, 'Не длиннее 500 символов'),
-  durationMinutes: z
-    .number({ error: 'Укажите число минут' })
-    .int('Целое число минут')
-    .min(5, 'От 5 до 240 минут')
-    .max(240, 'От 5 до 240 минут'),
-}) satisfies z.ZodType<EventTypeDto>
+/** Patterns from the contract have no readable meaning on their own, so their message is set per field. */
+const patternMessages: Record<string, string> = {
+  id: 'Только латиница в нижнем регистре, цифры и дефисы',
+}
 
-export const createBookingRequestSchema = z.object({
-  eventTypeId: z.string({ error: 'Обязательное поле' }).min(1, 'Обязательное поле'),
-  startAt: z.iso.datetime({ offset: true, error: 'Дата и время в формате ISO 8601' }),
-  guestName: z
-    .string({ error: 'Обязательное поле' })
-    .trim()
-    .min(1, 'Представьтесь, пожалуйста')
-    .max(100, 'Не длиннее 100 символов'),
-  guestEmail: z
-    .string({ error: 'Обязательное поле' })
-    .trim()
-    .max(254, 'Слишком длинный email')
-    .pipe(z.email('Укажите корректный email')),
-  comment: z.string().trim().max(1000, 'Не длиннее 1000 символов').optional(),
-}) satisfies z.ZodType<CreateBookingRequestDto>
+function russianMessage(issue: z.core.$ZodRawIssue): string | undefined {
+  switch (issue.code) {
+    case 'invalid_type':
+      if (issue.input === undefined) return 'Обязательное поле'
+      if (issue.expected === 'int' || issue.expected === 'number') return 'Укажите целое число'
+      return 'Неверный тип значения'
+    case 'too_small':
+      if (issue.origin === 'string') {
+        return Number(issue.minimum) <= 1 ? 'Заполните поле' : `Не короче ${issue.minimum} символов`
+      }
+      return `Не меньше ${issue.minimum}`
+    case 'too_big':
+      if (issue.origin === 'string') return `Не длиннее ${issue.maximum} символов`
+      return `Не больше ${issue.maximum}`
+    case 'invalid_format':
+      if (issue.format === 'email') return 'Укажите корректный email'
+      if (issue.format === 'datetime') return 'Дата и время в формате ISO 8601'
+      return patternMessages[String(issue.path?.[0])] ?? 'Неверный формат'
+    default:
+      return 'Некорректное значение'
+  }
+}
+
+z.config({ customError: russianMessage })
+
+function trimStrings(body: unknown): unknown {
+  if (typeof body !== 'object' || body === null || Array.isArray(body)) return body
+  return Object.fromEntries(
+    Object.entries(body).map(([key, value]) => [key, typeof value === 'string' ? value.trim() : value]),
+  )
+}
+
+/** Request schemas are generated from the contract; this layer only trims text fields. */
+export const eventTypeSchema = z.preprocess(trimStrings, zAdminCreateEventTypeBody) satisfies z.ZodType<EventTypeDto>
+
+export const createBookingRequestSchema = z.preprocess(
+  trimStrings,
+  zPublicCreateBookingBody,
+) satisfies z.ZodType<CreateBookingRequestDto>
 
 export type ParseResult<T> = { success: true; data: T } | { success: false; details: FieldErrorDto[] }
 

@@ -11,9 +11,19 @@ run = "npm run contract"
 
 [tasks."contract:check"]
 description = "Fail if generated contract files are out of date"
+# Compares the worktree with the index, so regenerated files only need `git add`; untracked output fails too.
 run = [
   "npm run contract",
-  "git diff --exit-code -- api-contract/openapi.yaml backend/src/api/model frontend/src/api",
+  '''
+paths="api-contract/openapi.yaml frontend/src/api/schema.d.ts backend/src/api/model/schema.d.ts backend/src/api/model/zod"
+stale=$(git status --porcelain --untracked-files=all -- $paths | grep '^.[^ ]' || true)
+if [ -n "$stale" ]; then
+  echo "$stale"
+  git --no-pager diff -- $paths
+  echo "Generated contract files are out of date: run 'npm run contract' and commit the result." >&2
+  exit 1
+fi
+''',
 ]
 
 [tasks.lint]

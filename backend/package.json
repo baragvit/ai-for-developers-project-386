@@ -10,15 +10,19 @@
     "test": "vitest run",
     "lint": "oxlint src test",
     "typecheck": "tsc --noEmit",
-    "gen:api": "openapi-typescript ../api-contract/openapi.yaml -o src/api/model/schema.d.ts"
+    "gen:api": "openapi-typescript ../api-contract/openapi.yaml -o src/api/model/schema.d.ts && openapi-ts"
   },
   "devDependencies": {
+    "@hey-api/openapi-ts": "0.99.0",
     "@types/node": "^22.20.5",
+    "ajv": "^8.20.0",
+    "ajv-formats": "^3.0.1",
     "openapi-typescript": "^7.13.0",
     "oxlint": "^1.92.0",
     "tsx": "^4.23.15",
     "typescript": "~5.9.3",
-    "vitest": "^5.1.0"
+    "vitest": "^5.1.0",
+    "yaml": "^2.9.1"
   },
   "dependencies": {
     "@date-fns/tz": "^1.5.0",
