@@ -11,9 +11,8 @@ Hexlet project «Запись на звонок» (Cal.com-like booking, no auth
   - `frontend/src/api/schema.d.ts` — client types for `openapi-fetch` (`openapi-typescript`).
   - `backend/src/api/model/schema.d.ts` — backend DTO types (`openapi-typescript`).
   - `backend/src/api/model/zod/` — backend zod request schemas (`@hey-api/openapi-ts`, exact version pinned, config in `backend/openapi-ts.config.ts`).
-- Backend request validation uses the generated zod schemas; `backend/src/api/validation.ts` only adds `.trim()` and Russian messages (zod global error map).
+- Backend request validation uses the generated zod schemas; `backend/src/api/validation.ts` only adds `.trim()`, `.multipleOf(5)` for `durationMinutes` (the zod generator drops `multipleOf`) and Russian messages (zod global error map).
 - The frontend reaches the API only through `frontend/src/api`; oxlint forbids `fetch`, `XMLHttpRequest` and `openapi-fetch` elsewhere.
-- Backend API tests call `injectChecked` (`backend/test/contract.ts`): every response is validated against `api-contract/openapi.yaml` by operation and status.
 
 ## Layout
 
@@ -21,7 +20,7 @@ Hexlet project «Запись на звонок» (Cal.com-like booking, no auth
 - `backend/` — Fastify. Layers:
   - `src/api/` — routes, request validation (generated zod schemas), DTO ↔ domain mappers. DTO types come from `src/api/model`.
   - `src/services/` — business logic. Takes and returns primitives, domain types (`src/domain/model.ts`) or `Result`; never API DTOs.
-  - `src/domain/` — domain types, `Result`, slot generation (pure functions).
+  - `src/domain/` — domain types, `Result`, slot generation and `overlaps` (pure functions).
   - `src/storage/` — repositories (in-memory).
 - `e2e/` — Playwright scenarios against the production build.
 
@@ -31,13 +30,32 @@ Tool versions are pinned in `mise.toml`.
 
 ```bash
 mise install && mise run install
-npm run contract      # TypeSpec -> OpenAPI -> TS types
+npm run contract      # TypeSpec -> OpenAPI -> TS types and backend zod schemas
 npm run mock          # Prism mock on :4010
 npm run dev:backend   # :7341
 npm run dev:frontend  # :5391, proxies /api to API_PROXY_TARGET (default :7341)
-mise run check        # contract up to date, lint, typecheck, unit tests, e2e — same command as CI
+mise run check        # contract:check -> lint -> typecheck -> test -> e2e; same command as CI (make check)
 mise run check:rule-guard  # conflict API tests must fail with the overlap check patched out (separate CI step)
 ```
+
+- e2e starts the production build on `E2E_PORT` (default 7399) and reuses a server already listening there outside CI; give parallel worktrees distinct ports: `E2E_PORT=7420 mise run check`.
+- CI (`.github/workflows/ci.yml`): `mise run check`, then `mise run check:rule-guard`, then a Docker image build with a smoke test.
+- Releases: release-please on push to `main` keeps a release PR (one version in the root `package.json`, one `CHANGELOG.md`, tag `vX.Y.Z`) built from Conventional Commits; a human merges it. Config: `release-please-config.json`, `.release-please-manifest.json`.
+
+## Tests
+
+Test behavior through a public boundary, never internals; time comes from an injected clock.
+
+| Boundary | Where | Covers |
+| --- | --- | --- |
+| Domain | `backend/test/schedule.test.ts`, `overlaps.test.ts` | slot window, working hours in the owner's zone, grid, started slots, half-open overlap |
+| Services | `backend/test/*-service.test.ts` | bookings and event types through `Result`, no HTTP |
+| API (main one for rules) | `backend/test/api.test.ts`, `booking-conflicts.test.ts` | full Fastify app via `injectChecked`: statuses, bodies, error codes, check order, adjacency, cross-type overlap, concurrent requests |
+| Components | `frontend/src/**/*.test.tsx` | Vitest + Testing Library on a mocked client (`frontend/src/test/api.ts`) |
+| Browser | `e2e/tests/booking.spec.ts` | Playwright against the production build with the real server, desktop and Pixel 7; never mock the API (`page.route`) |
+
+- `injectChecked` (`backend/test/contract.ts`) fails the test unless the method and path are an operation in `api-contract/openapi.yaml`, the status is declared for it and the body matches its schema. Use it for every request to a contract operation; plain `app.inject` only for routes outside the contract (SPA hosting, unknown routes).
+- `booking-conflicts.test.ts` is what `check:rule-guard` runs; keep conflict tests there.
 
 ## Conventions
 
