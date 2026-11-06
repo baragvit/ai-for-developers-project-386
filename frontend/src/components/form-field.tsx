@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
 import { Label } from '@/components/ui/label'
+import { fieldErrorId } from '@/lib/field-error'
 
 export function FormField({
   id,
@@ -21,7 +22,11 @@ export function FormField({
         {hint && <span className="text-xs font-normal text-muted-foreground">{hint}</span>}
       </Label>
       {children}
-      {error && <p className="text-sm text-destructive">{error}</p>}
+      {error && (
+        <p id={fieldErrorId(id)} className="text-sm text-destructive">
+          {error}
+        </p>
+      )}
     </div>
   )
 }
