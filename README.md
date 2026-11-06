@@ -193,7 +193,7 @@ docker build -t call-booking .
 docker run --rm -e PORT=3000 -p 3000:3000 call-booking   # http://localhost:3000
 ```
 
-Рабочий экземпляр: https://call-booking-r8mx.onrender.com — Web Service на [Render](https://render.com) (runtime Docker, ветка `main`, автодеплой на каждый коммит). Render сам передаёт `PORT`. Для ручной настройки есть blueprint [`render.yaml`](render.yaml).
+Рабочий экземпляр: https://call-booking-r8mx.onrender.com — Web Service на [Render](https://render.com) (runtime Docker, ветка `main`). Сервис подключён к публичному репозиторию без GitHub-приложения Render, поэтому коммиты сами не выкатываются: новый деплой запускает агент через Render MCP (`trigger_deploy`) или кнопка **Manual Deploy** в Dashboard. Render сам передаёт `PORT`. Для ручной настройки есть blueprint [`render.yaml`](render.yaml).
 
 **Данные сбрасываются после перезапуска.** Хранилище in-memory (см. [ADR-0002](docs/adr/0002-in-memory-single-process-storage.md)): записи живут только в памяти процесса и пропадают при каждом деплое, рестарте и засыпании бесплатного инстанса Render после ~15 минут простоя; демо-типы встреч создаются заново при старте.
 
