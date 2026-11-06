@@ -5,6 +5,8 @@
 
 Учебный проект [Хекслета](https://ru.hexlet.io/programs/ai-for-developers) «Запись на звонок»: упрощённый сервис бронирования встреч по мотивам [Cal.com](https://cal.com). Как это должно работать: https://files.hexlet.app/a/2ipc5m
 
+**Демо:** https://call-booking-r8mx.onrender.com (Render, бесплатный план: после простоя первый запрос может идти до минуты).
+
 Сценарий один: владелец календаря публикует типы встреч, гость выбирает свободный слот и записывается на звонок, а владелец видит список предстоящих встреч. Авторизации, личных кабинетов и интеграций с внешними календарями нет — функциональность намеренно ограничена, чтобы пройти весь путь от проектирования API до запуска в контейнере.
 
 ## Роли и правила
@@ -184,7 +186,32 @@ Release PR создаётся с `GITHUB_TOKEN`, поэтому CI на нём �
 
 ## Деплой
 
-Приложение упаковано в один Docker-образ и слушает порт из переменной `PORT`, поэтому подходит для Render, Railway, Fly.io и подобных платформ. Для [Render](https://render.com) есть blueprint [`render.yaml`](render.yaml): создайте Web Service из репозитория, рантайм — Docker.
+Приложение упаковано в один Docker-образ ([`Dockerfile`](Dockerfile) в корне): Node-процесс отдаёт и API, и собранный фронтенд, стартует сам при запуске контейнера и слушает порт из переменной `PORT` (по умолчанию в образе — `8080`).
+
+```bash
+docker build -t call-booking .
+docker run --rm -e PORT=3000 -p 3000:3000 call-booking   # http://localhost:3000
+```
+
+Рабочий экземпляр: https://call-booking-r8mx.onrender.com — Web Service на [Render](https://render.com) (runtime Docker, ветка `main`, автодеплой на каждый коммит). Render сам передаёт `PORT`. Для ручной настройки есть blueprint [`render.yaml`](render.yaml).
+
+**Данные сбрасываются после перезапуска.** Хранилище in-memory (см. [ADR-0002](docs/adr/0002-in-memory-single-process-storage.md)): записи живут только в памяти процесса и пропадают при каждом деплое, рестарте и засыпании бесплатного инстанса Render после ~15 минут простоя; демо-типы встреч создаются заново при старте.
+
+### Деплой агентом через Render MCP
+
+Сервис создан и проверен агентом Cursor через [Render MCP](https://render.com/docs/mcp-server). Проектная конфигурация — [`.cursor/mcp.json`](.cursor/mcp.json); ключа в ней нет, он подставляется из переменной окружения:
+
+```json
+{ "mcpServers": { "render": { "url": "https://mcp.render.com/mcp",
+  "headers": { "Authorization": "Bearer ${env:RENDER_API_KEY}" } } } }
+```
+
+Подключение:
+
+1. В Render Dashboard: **Account Settings → API Keys → Create API Key**.
+2. Экспортируйте ключ в окружение, из которого запускается Cursor, например в `~/.bashrc`: `export RENDER_API_KEY=rnd_...`. Ключ не коммитьте — `.env` и `.env.*` в `.gitignore`.
+3. Запустите Cursor из этого окружения (`source ~/.bashrc && cursor .`), в **Cursor Settings → MCP** включите сервер `render` и откройте новый чат.
+4. Попросите агента выбрать workspace и создать Web Service (runtime Docker, репозиторий, ветка `main`); агент дождётся деплоя и проверит сервис по ссылке.
 
 ---
 
