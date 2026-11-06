@@ -38,3 +38,19 @@ mise run check        # contract up to date, lint, typecheck, unit tests, e2e â€
 - UI copy is in Russian; code, identifiers and comments are in English.
 - Times travel over the API as ISO 8601 UTC; the frontend renders them in the viewer's time zone, the backend computes working hours in the owner's time zone.
 - Business rule to keep covered by tests: two bookings can never overlap, even for different event types.
+
+## Agent skills
+
+Engineering skills from [mattpocock/skills](https://github.com/mattpocock/skills) live in `.agents/skills/` (Claude Code reads them via `.claude/skills/`); versions are pinned in `skills-lock.json`.
+
+### Issue tracker
+
+GitHub Issues in `baragvit/ai-for-developers-project-386`, via the `gh` CLI. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Default vocabulary: `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`. See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context: `GLOSSARY.md` and `docs/adr/` at the repo root. See `docs/agents/domain.md`.
