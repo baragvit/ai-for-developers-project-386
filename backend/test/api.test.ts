@@ -4,6 +4,7 @@ import path from 'node:path'
 import type { FastifyInstance } from 'fastify'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { buildApp } from '../src/app.js'
+import { loadConfig } from '../src/config.js'
 import { injectChecked } from './contract.js'
 import { MONDAY_8AM_MSK, testConfig } from './helpers.js'
 
@@ -14,6 +15,50 @@ const bookingBody = {
   guestEmail: 'ivan@example.com',
   comment: 'Обсудить архитектуру',
 }
+
+describe('GET /api/owner', () => {
+  const getOwner = async (env: NodeJS.ProcessEnv) => {
+    const app = await buildApp({ config: loadConfig(env), clock: () => MONDAY_8AM_MSK })
+    try {
+      return await injectChecked(app, { method: 'GET', url: '/api/owner' })
+    } finally {
+      await app.close()
+    }
+  }
+
+  it('returns the default owner profile when no env is set', async () => {
+    const res = await getOwner({})
+    expect(res.statusCode).toBe(200)
+    expect(res.json()).toEqual({
+      name: 'Анна Смирнова',
+      timezone: 'Europe/Moscow',
+      workdayStart: '09:00',
+      workdayEnd: '18:00',
+      workingDays: [1, 2, 3, 4, 5],
+      bookingWindowDays: 14,
+    })
+  })
+
+  it('takes the owner profile from env', async () => {
+    const res = await getOwner({
+      OWNER_NAME: 'Пётр Иванов',
+      OWNER_TIMEZONE: 'Asia/Tokyo',
+      WORKDAY_START: '10:30',
+      WORKDAY_END: '19:00',
+      WORKING_DAYS: '7, 6,1',
+      BOOKING_WINDOW_DAYS: '7',
+    })
+    expect(res.statusCode).toBe(200)
+    expect(res.json()).toEqual({
+      name: 'Пётр Иванов',
+      timezone: 'Asia/Tokyo',
+      workdayStart: '10:30',
+      workdayEnd: '19:00',
+      workingDays: [1, 6, 7],
+      bookingWindowDays: 7,
+    })
+  })
+})
 
 describe('HTTP API', () => {
   let app: FastifyInstance
@@ -27,19 +72,6 @@ describe('HTTP API', () => {
   })
 
   const inject = (options: Parameters<typeof injectChecked>[1]) => injectChecked(app, options)
-
-  it('returns the owner profile', async () => {
-    const res = await inject({ method: 'GET', url: '/api/owner' })
-    expect(res.statusCode).toBe(200)
-    expect(res.json()).toEqual({
-      name: 'Анна Смирнова',
-      timezone: 'Europe/Moscow',
-      workdayStart: '09:00',
-      workdayEnd: '18:00',
-      workingDays: [1, 2, 3, 4, 5],
-      bookingWindowDays: 14,
-    })
-  })
 
   it('lists event types and returns one by id', async () => {
     const list = await inject({ method: 'GET', url: '/api/event-types' })
