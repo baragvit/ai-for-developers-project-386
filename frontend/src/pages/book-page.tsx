@@ -32,6 +32,7 @@ export function BookPage() {
   const [selectedSlot, setSelectedSlot] = useState<TimeSlot>()
   const [lastViewedDay, setLastViewedDay] = useState<Date>()
   const [booking, setBooking] = useState<Booking>()
+  const [guest, setGuest] = useState<GuestValues>(emptyGuest)
 
   if (eventType.error?.code === 'NOT_FOUND') {
     return (
@@ -73,6 +74,7 @@ export function BookPage() {
   const handleBooked = (created: Booking) => {
     setBooking(created)
     setSelectedSlot(undefined)
+    setGuest(emptyGuest)
   }
 
   return (
@@ -93,6 +95,8 @@ export function BookPage() {
           <GuestForm
             eventType={eventType.data}
             slot={selectedSlot}
+            values={guest}
+            onChange={setGuest}
             onBack={() => setSelectedSlot(undefined)}
             onBooked={handleBooked}
             onSlotLost={() => setSelectedSlot(undefined)}
@@ -240,11 +244,15 @@ function SlotPicker({
   )
 }
 
-type FormErrors = Partial<Record<'guestName' | 'guestEmail' | 'comment', string>>
+type GuestValues = { guestName: string; guestEmail: string; comment: string }
+
+const emptyGuest: GuestValues = { guestName: '', guestEmail: '', comment: '' }
+
+type FormErrors = Partial<Record<keyof GuestValues, string>>
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
-function validateGuest(values: { guestName: string; guestEmail: string; comment: string }): FormErrors {
+function validateGuest(values: GuestValues): FormErrors {
   const errors: FormErrors = {}
   if (!values.guestName.trim()) errors.guestName = 'Представьтесь, пожалуйста'
   else if (values.guestName.trim().length > 100) errors.guestName = 'Не длиннее 100 символов'
@@ -257,22 +265,25 @@ function validateGuest(values: { guestName: string; guestEmail: string; comment:
 function GuestForm({
   eventType,
   slot,
+  values,
+  onChange,
   onBack,
   onBooked,
   onSlotLost,
 }: {
   eventType: EventType
   slot: TimeSlot
+  values: GuestValues
+  onChange: (values: GuestValues) => void
   onBack: () => void
   onBooked: (booking: Booking) => void
   onSlotLost: () => void
 }) {
-  const [values, setValues] = useState({ guestName: '', guestEmail: '', comment: '' })
   const [errors, setErrors] = useState<FormErrors>({})
   const createBooking = useCreateBooking()
 
-  const update = (field: keyof typeof values) => (value: string) => {
-    setValues((prev) => ({ ...prev, [field]: value }))
+  const update = (field: keyof GuestValues) => (value: string) => {
+    onChange({ ...values, [field]: value })
     setErrors((prev) => ({ ...prev, [field]: undefined }))
   }
 

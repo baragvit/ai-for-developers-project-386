@@ -1,4 +1,4 @@
-import { screen } from '@testing-library/react'
+import { screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it } from 'vitest'
 import type { TimeSlot } from '@/api/client'
@@ -125,5 +125,38 @@ describe('Форма записи', () => {
     expect(screen.getByLabelText(/Комментарий/)).toHaveAttribute('aria-invalid', 'true')
     expect(screen.getByLabelText('Ваше имя')).toHaveAttribute('aria-invalid', 'false')
     expect(screen.getByLabelText('Email')).toHaveValue('olga@example.c')
+  })
+
+  it('при конфликте сообщает, что время заняли, обновляет слоты и сохраняет введённые данные', async () => {
+    openBookPage(slots)
+    const lostSlot = (await screen.findAllByTestId('slot')).find((slot) => slot.textContent === '16:30')!
+    await userEvent.click(lostSlot)
+    await userEvent.type(screen.getByLabelText('Ваше имя'), 'Ольга')
+    await userEvent.type(screen.getByLabelText('Email'), 'olga@example.com')
+    await userEvent.type(screen.getByLabelText(/Комментарий/), 'Про интеграцию')
+
+    respond('POST', '/api/bookings', { code: 'SLOT_TAKEN', message: 'Это время уже занято другой записью' }, 409)
+    respond(
+      'GET',
+      `/api/event-types/${eventType.id}/slots`,
+      slots.map((slot) => (slot.startAt === '2026-11-10T06:30:00.000Z' ? { ...slot, available: false } : slot)),
+    )
+    await userEvent.click(screen.getByRole('button', { name: 'Записаться' }))
+
+    expect(await screen.findByText('Это время только что заняли. Выберите другой слот.')).toBeInTheDocument()
+    expect(screen.queryByLabelText('Ваше имя')).not.toBeInTheDocument()
+    await waitFor(() =>
+      expect(shownSlots()).toEqual([
+        { time: '00:30', available: true },
+        { time: '16:00', available: false },
+        { time: '16:30', available: false },
+      ]),
+    )
+
+    await userEvent.click(screen.getAllByTestId('slot')[0]!)
+
+    expect(screen.getByLabelText('Ваше имя')).toHaveValue('Ольга')
+    expect(screen.getByLabelText('Email')).toHaveValue('olga@example.com')
+    expect(screen.getByLabelText(/Комментарий/)).toHaveValue('Про интеграцию')
   })
 })
