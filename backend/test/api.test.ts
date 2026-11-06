@@ -113,13 +113,77 @@ describe('HTTP API', () => {
     ])
   })
 
-  it('returns slots for an event type', async () => {
-    const res = await inject({ method: 'GET', url: '/api/event-types/consultation/slots' })
-    expect(res.statusCode).toBe(200)
-    expect(res.json()[0]).toEqual({
-      startAt: '2026-11-09T06:00:00.000Z',
-      endAt: '2026-11-09T06:30:00.000Z',
-      available: true,
+  describe('slots', () => {
+    type SlotDto = { startAt: string; endAt: string; available: boolean }
+    const listSlots = async (eventTypeId: string) => {
+      const res = await inject({ method: 'GET', url: `/api/event-types/${eventTypeId}/slots` })
+      expect(res.statusCode).toBe(200)
+      return res.json() as SlotDto[]
+    }
+
+    it('returns the whole window of slots sized by the event type, sorted by time', async () => {
+      const slots = await listSlots('consultation')
+
+      // Monday 9 – Friday 20 November: 10 working days, 18 half-hour slots each.
+      expect(slots).toHaveLength(180)
+      expect(slots[0]).toEqual({
+        startAt: '2026-11-09T06:00:00.000Z',
+        endAt: '2026-11-09T06:30:00.000Z',
+        available: true,
+      })
+      expect(slots.at(-1)).toEqual({
+        startAt: '2026-11-20T14:30:00.000Z',
+        endAt: '2026-11-20T15:00:00.000Z',
+        available: true,
+      })
+      const starts = slots.map((slot) => slot.startAt)
+      expect(starts).toEqual([...starts].sort())
+      expect(slots.some((slot) => slot.startAt.startsWith('2026-11-14'))).toBe(false)
+    })
+
+    it('ends the 45-minute grid of a workday at 17:15', async () => {
+      const monday = (await listSlots('code-review')).filter((slot) => slot.startAt.startsWith('2026-11-09'))
+
+      expect(monday).toHaveLength(12)
+      expect(monday.at(-1)).toEqual({
+        startAt: '2026-11-09T14:15:00.000Z',
+        endAt: '2026-11-09T15:00:00.000Z',
+        available: true,
+      })
+    })
+
+    it('leaves out slots that have already started', async () => {
+      await app.close()
+      app = await buildApp({ config: testConfig, clock: () => new Date('2026-11-09T09:10:00Z') })
+
+      const slots = await listSlots('consultation')
+
+      expect(slots[0]!.startAt).toBe('2026-11-09T09:30:00.000Z')
+    })
+
+    it('marks slots overlapping a booking of any event type as unavailable', async () => {
+      const booked = await inject({
+        method: 'POST',
+        url: '/api/bookings',
+        payload: { ...bookingBody, eventTypeId: 'tech-interview' },
+      })
+      expect(booked.statusCode).toBe(201)
+
+      const slots = await listSlots('consultation')
+
+      expect(slots).toHaveLength(180)
+      expect(slots.slice(0, 3)).toEqual([
+        { startAt: '2026-11-09T06:00:00.000Z', endAt: '2026-11-09T06:30:00.000Z', available: false },
+        { startAt: '2026-11-09T06:30:00.000Z', endAt: '2026-11-09T07:00:00.000Z', available: false },
+        { startAt: '2026-11-09T07:00:00.000Z', endAt: '2026-11-09T07:30:00.000Z', available: true },
+      ])
+    })
+
+    it('answers 404 for an unknown event type', async () => {
+      const res = await inject({ method: 'GET', url: '/api/event-types/nope/slots' })
+
+      expect(res.statusCode).toBe(404)
+      expect(res.json()).toMatchObject({ code: 'NOT_FOUND' })
     })
   })
 
